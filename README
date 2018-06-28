@@ -1,0 +1,14 @@
+# Cedrick Ansorge, June 28, 2018  
+# cedrick@posteo.de 
+
+FORTRAN 90 code for the Analysis of Variance Decomposition of 4D data stored in a netCDF file. 
+Equations according to which the variance is decomposed are contained in 
+doc/anova_reference.pdf   
+
+Compilation through running ./compile.sh 
+(compiler and flags might have to be adjusted depending on the system)  
+
+Source code is contained in src/
+
+
+
