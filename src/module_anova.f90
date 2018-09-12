@@ -4,20 +4,91 @@ MODULE ANOVA
   USE NC_READWRITE 
   USE TIMER 
 
+  PRIVATE :: ANOVA_GETDIMSTR
+
   TYPE T_ANOVA 
      INTEGER :: nx,ny,nz,nt,ndim  
-     CHARACTER(LEN=20)                          :: xdim,ydim,zdim,tdim,vname
-     CHARACTER(LEN=20)                          :: fname 
-     REAL(KIND=8)                               :: f_empty,si_residual
-     REAL(KIND=8), DIMENSION(:),    ALLOCATABLE :: f_x,f_y,f_z,f_t 
-     REAL(KIND=8), DIMENSION(:,:),  ALLOCATABLE :: f_yx,f_yz,f_yt,f_xz,f_xt,f_zt
-     REAL(KIND=8), DIMENSION(:,:,:),ALLOCATABLE :: f_yxz,f_yxt,f_yzt,f_xzt 
-     REAL(KIND=8), DIMENSION(:),    ALLOCATABLE :: si 
-     LOGICAL,      DIMENSION(:),    ALLOCATABLE :: f_save 
+     CHARACTER(LEN=20)                               :: xdim,ydim,zdim,tdim,vname
+     CHARACTER(LEN=20)                               :: fname 
+     REAL(KIND=8)                                    :: f_empty,si_residual
+     REAL(KIND=8),      DIMENSION(:),    ALLOCATABLE :: f_x,f_y,f_z,f_t 
+     REAL(KIND=8),      DIMENSION(:,:),  ALLOCATABLE :: f_yx,f_yz,f_yt,f_xz,f_xt,f_zt
+     REAL(KIND=8),      DIMENSION(:,:,:),ALLOCATABLE :: f_yxz,f_yxt,f_yzt,f_xzt 
+     REAL(KIND=8),      DIMENSION(:),    ALLOCATABLE :: si 
+     LOGICAL,           DIMENSION(:),    ALLOCATABLE :: f_save   
+     INTEGER,           DIMENSION(:),    ALLOCATABLE :: si_order 
+     CHARACTER(LEN=32), DIMENSION(:),    ALLOCATABLE :: si_tag
   END TYPE T_ANOVA
 
   CONTAINS
 
+  SUBROUTINE GET_SORT_INDICES(n,arr,idx)
+    
+    IMPLICIT NONE 
+
+    INTEGER,                      INTENT(IN) :: n 
+    REAL(KIND=8),    DIMENSION(N),INTENT(IN) :: arr(n) 
+    INTEGER,         DIMENSION(N),INTENT(OUT):: idx     
+    !LOCAL 
+    REAL a 
+    INTEGER i,j 
+
+    DO j=2, n
+       a=arr(j)
+       DO i=j-1,1,-1
+          if (ARR(i)<=a) goto 10
+          idx(i+1)=i
+       ENDDO
+       i=0
+10     idx(i+1)=j
+    ENDDO
+    RETURN
+
+  END SUBROUTINE GET_SORT_INDICES
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! SET STRING ARRAY FOR DIMENSION NAMES
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+  SUBROUTINE ANOVA_SETDIMSTR(a) 
+    
+    IMPLICIT NONE
+
+    INTEGER :: i  
+    TYPE(T_ANOVA) :: a
+    CHARACTER(LEN=20) :: x,y,z,t 
+    x=a%xdim; y=a%ydim; z=a%zdim; t=a%tdim
+
+    ALLOCATE(a%si_tag(DLAST)) 
+    
+    a%si_tag(:) =''
+
+    WRITE(a%si_tag(DTOT),103) 'TOTAL VARIANCE' 
+    WRITE(a%si_tag(DYXZ),105) y,x,z
+    WRITE(a%si_tag(DYX),106)  y,x
+    WRITE(a%si_tag(DYZ),106)  y,z
+    WRITE(a%si_tag(DXZ),106)  x,z
+    WRITE(a%si_tag(DY),107)   y
+    WRITE(a%si_tag(DX),107)   x
+    WRITE(a%si_tag(DZ),107)   z
+    IF(a%ndim.GT.3) THEN 
+       WRITE(a%si_tag(DYXZT),104)y,x,z,t 
+       WRITE(a%si_tag(DYXT),105) y,x,t
+       WRITE(a%si_tag(DYZT),105) y,z,t
+       WRITE(a%si_tag(DXZT),105) x,z,t
+       WRITE(a%si_tag(DYT),106)  y,t
+       WRITE(a%si_tag(DXT),106)  x,t
+       WRITE(a%si_tag(DZT),106)  z,t
+       WRITE(a%si_tag(DT),107)   t 
+    ENDIF 
+
+103 FORMAT(A15)
+104 FORMAT(A3,'-',A3,'-',A3,'-',A3,';')
+105 FORMAT(A3,'-',A3,'-',A3,'    ;')
+106 FORMAT(A3,'-',A3,'        ;')
+107 FORMAT(A3,'            ;')
+
+
+  END SUBROUTINE ANOVA_SETDIMSTR
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! ANOVA BINARY OUTPUT 
@@ -134,12 +205,10 @@ MODULE ANOVA
     ! LOCAL DEFINITIONS 
     CHARACTER(LEN=*)         :: fname  
     INTEGER,       PARAMETER :: funit=27 
-    INTEGER                  :: ndim
+    INTEGER                  :: i
     REAL(KIND=8)             :: si_max 
 
-    ndim = a%ndim 
-    
-    IF ( ndim.LT.3 .OR. ndim .GT. 4 ) & 
+    IF ( a%ndim.LT.3 .OR. a%ndim .GT. 4 ) & 
        STOP 'ANOVA NOT IMPLEMENTED FOR LESS THAN 3 OR MORE THAN 4 DIMENSIONS' 
 
     si_max=MAXVAL(a%si(2:DLAST))
@@ -148,56 +217,53 @@ MODULE ANOVA
 
     WRITE(funit,106) 'DIM', 'VARIANCE', 'SENSITIVITY','SENSITIVITY-2' 
     WRITE(funit,104) 'TOTAL VAR',   a%si(Dtot),1.0 
-    WRITE(funit,104) 'RESIDUAL VAR',a%si_residual,a%si_residual/a%si(DTOT) 
-    IF(ndim.EQ.4)WRITE(funit,105) a%ydim,a%xdim,a%zdim,a%tdim,a%si(Dyxzt),&
-         100.*a%si(Dyxzt)/a%si(Dtot),100.*a%si(DYXZT)/(a%si(Dtot)-si_max)
-    WRITE(funit,105)              a%ydim,a%xdim,a%zdim,'',    a%si(Dyxz), &
-         100.*a%si(Dyxz)/a%si(Dtot), 100.*a%si(DYXZ)/(a%si(Dtot)-si_max)
-    IF(ndim.EQ.4)WRITE(funit,105) a%ydim,a%xdim,a%tdim,'',    a%si(Dyxt), &
-         100.*a%si(Dyxt)/a%si(Dtot), 100.*a%si(DYXT)/(a%si(Dtot)-si_max)
-    IF(ndim.EQ.4)WRITE(funit,105) a%ydim,a%zdim,a%tdim,'',    a%si(Dyzt), &
-         100.*a%si(Dyzt)/a%si(Dtot), 100.*a%si(DYZT)/(a%si(Dtot)-si_max)
-    IF(ndim.EQ.4)WRITE(funit,105) a%xdim,a%zdim,a%tdim,'',    a%si(Dxzt), &
-         100.*a%si(Dxzt)/a%si(Dtot), 100.*a%si(DXZT)/(a%si(Dtot)-si_max)
-    WRITE(funit,105)              a%ydim,a%xdim,'','',        a%si(Dyx),  &
-         100.*a%si(Dyx)/a%si(Dtot),  100.*a%si(DYX)/(a%si(Dtot)-si_max)
-    WRITE(funit,105)              a%ydim,a%zdim,'','',        a%si(Dyz),  &
-         100.*a%si(Dyz)/a%si(Dtot),  100.*a%si(DYZ)/(a%si(Dtot)-si_max)
-    IF(ndim.EQ.4)WRITE(funit,105) a%ydim,a%tdim,'','',        a%si(Dyt),  &
-         100.*a%si(Dyt)/a%si(Dtot),  100.*a%si(DYT)/(a%si(Dtot)-si_max)
-    WRITE(funit,105)              a%xdim,a%zdim,'','',        a%si(Dxz),  &
-         100.*a%si(Dxz)/a%si(Dtot),  100.*a%si(DXZ)/(a%si(Dtot)-si_max)
-    IF(ndim.EQ.4)WRITE(funit,105) a%xdim,a%tdim,'','',        a%si(Dxt),  &
-         100.*a%si(Dxt)/a%si(Dtot),  100.*a%si(DXT)/(a%si(Dtot)-si_max)
-    IF(ndim.EQ.4)WRITE(funit,105) a%zdim,a%tdim,'','',        a%si(Dzt),  &
-         100.*a%si(Dzt)/a%si(Dtot),  100.*a%si(DZT)/(a%si(Dtot)-si_max)
-    WRITE(funit,105)              a%xdim,'',  '','',          a%si(Dx),   &
-         100.*a%si(Dx)/a%si(Dtot),   100.*a%si(DX)/(a%si(Dtot)-si_max)
-    WRITE(funit,105)              a%ydim,'',  '','',          a%si(Dy),   &
-         100.*a%si(Dy)/a%si(Dtot),   100.*a%si(DY)/(a%si(Dtot)-si_max)
-    WRITE(funit,105)              a%zdim,'',  '','',          a%si(Dz),   &
-         100.*a%si(Dz)/a%si(Dtot),   100.*a%si(DZ)/(a%si(Dtot)-si_max)
-    IF(ndim.EQ.4)WRITE(funit,105) a%tdim,'',  '','',          a%si(Dt),   &
-         100.*a%si(Dt)/a%si(Dtot),   100.*a%si(DT)/(a%si(Dtot)-si_max)
+    WRITE(funit,104) 'RESIDUAL VAR',a%si_residual,a%si_residual/a%si(DTOT)  
+
+    DO i=2,DLAST  
+       IF(len(TRIM(a%si_tag(i))) .GT. 0) & 
+            WRITE(funit,105) a%si_tag(i),a%si(i),&
+            100.*a%si(i)/a%si(Dtot),100.*a%si(i)/(a%si(Dtot)-si_max)
+    ENDDO
   ! 
     CLOSE(funit) 
 106 FORMAT('#',a3,';',a9,  ';',a11,';',a13)
-105 FORMAT(a3,'-',a3,'-',a3,'-',a3,';',g10.3,';',g11.3'%;',g11.3,'%;') 
+105 FORMAT(a15,';',g10.3,';',g11.3'%;',g11.3,'%;') 
 104 FORMAT(a15,';',g10.3,';',g11.3';') 
   END SUBROUTINE ANOVA_OUTPUT_ASC
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! ANOVA OUTPUT FOR DATA COMPRESSION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
+  SUBROUTINE ANOVA_OUTPUT_COMPRESS(a,fname)  
+    
+    IMPLICIT NONE 
+
+    ! PARAMETERS 
+    TYPE(T_ANOVA), INTENT(IN):: a  
+
+    ! LOCAL DEFINITIONS 
+    CHARACTER(LEN=*)         :: fname  
+    INTEGER,       PARAMETER :: funit=27 
+    INTEGER                  :: ndim
+    REAL(KIND=8)             :: si_max 
+
+
+    
+    
+  END SUBROUTINE ANOVA_OUTPUT_COMPRESS
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! ANOVA 3D - variance decomposition and sensitivity indices 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  SUBROUTINE ANOVA_DECOMP3D(vname,xdim,ydim,zdim,fixed_dim,fixed_pos,an) 
+  SUBROUTINE ANOVA_DECOMP3D(vname,xdim,ydim,zdim,fixed_dim,fixed_pos,a) 
 
     IMPLICIT NONE 
 
     INTEGER,          INTENT(IN) :: fixed_pos
     CHARACTER(LEN=*), INTENT(IN) :: vname,xdim,ydim,zdim,fixed_dim 
-    TYPE(T_ANOVA)                :: an
+    TYPE(T_ANOVA)                :: a
 
     REAL(KIND=8)                              :: avg_yxz,rdum               !,f_empty
     REAL(KIND=8), DIMENSION(:),   ALLOCATABLE :: avg_yx, avg_yz,avg_xz      !,f_x,f_y,f_z  
@@ -216,10 +282,10 @@ MODULE ANOVA
 
     CALL TIMER_START() 
 
-    nx=ncrw_getdimlen(xdim);      an%nx=nx
-    ny=ncrw_getdimlen(ydim);      an%ny=ny 
-    nz=ncrw_getdimlen(zdim);      an%nz=nz 
-    nt=ncrw_getdimlen(fixed_dim); an%nt=nt 
+    nx=ncrw_getdimlen(xdim);      a%nx=nx
+    ny=ncrw_getdimlen(ydim);      a%ny=ny 
+    nz=ncrw_getdimlen(zdim);      a%nz=nz 
+    nt=ncrw_getdimlen(fixed_dim); a%nt=nt 
 
     IF ( ncrw_verbose ) THEN 
        WRITE(*,*) '============'
@@ -231,7 +297,6 @@ MODULE ANOVA
     nyxz=ny*nx*nz
     yz_dims(1) = ydim;  yz_dims(2) = zdim
     xt_dims(1) = xdim;  xt_dims(2) = fixed_dim
-
 
     ALLOCATE(avg_yx(nz),avg_yz(nx),avg_xz(ny)) 
     ALLOCATE(avg_x(ny,nz), avg_y(nx,nz), avg_z(ny,nx),data(ny,nz),wrk(ny,nz)) 
@@ -297,46 +362,46 @@ MODULE ANOVA
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
     CALL TIMER_START() 
     IF ( ncrw_verbose ) WRITE(*,*) 'ANOVA_DECOMP3D: STEP 2 - DECOMPOSITION AND SENSITIVITY INDICES' 
-    an%f_empty=avg_yxz 
+    a%f_empty=avg_yxz 
     ! 
-    an%f_x=avg_yz-an%f_empty
-    an%f_y=avg_xz-an%f_empty 
-    an%f_z=avg_yx-an%f_empty  
+    a%f_x=avg_yz-a%f_empty
+    a%f_y=avg_xz-a%f_empty 
+    a%f_z=avg_yx-a%f_empty  
     ! 
     DO iy=1,ny 
-       DO ix=1,nx; an%f_yx(iy,ix)=avg_z(iy,ix)-an%f_x(ix)-an%f_y(iy)-an%f_empty;ENDDO 
-       DO iz=1,nz; an%f_yz(iy,iz)=avg_x(iy,iz)-an%f_z(iz)-an%f_y(iy)-an%f_empty;ENDDO
+       DO ix=1,nx; a%f_yx(iy,ix)=avg_z(iy,ix)-a%f_x(ix)-a%f_y(iy)-a%f_empty;ENDDO 
+       DO iz=1,nz; a%f_yz(iy,iz)=avg_x(iy,iz)-a%f_z(iz)-a%f_y(iy)-a%f_empty;ENDDO
     ENDDO
     DO ix=1,nx; 
-       DO iz=1,nz; an%f_xz(ix,iz)=avg_y(ix,iz)-an%f_z(iz)-an%f_x(ix)-an%f_empty;ENDDO  
+       DO iz=1,nz; a%f_xz(ix,iz)=avg_y(ix,iz)-a%f_z(iz)-a%f_x(ix)-a%f_empty;ENDDO  
     ENDDO 
 
-    an%si(:DLAST) = 0. 
+    a%si(:DLAST) = 0. 
     DO ix=1,nx  
        pos(1)=ix
        CALL ncrw_getvar_slice(vname,yz_dims,xt_dims,pos,data)   
        DO iy=1,ny; DO iz=1,nz  
-          an%f_yxz(iy,ix,iz) = data(iy,iz) - an%f_yx(iy,ix) - an%f_xz(ix,iz) - an%f_yz(iy,iz) & 
-               - an%f_x(ix) - an%f_y(iy) - an%f_z(iz) - an%f_empty
+          a%f_yxz(iy,ix,iz) = data(iy,iz) - a%f_yx(iy,ix) - a%f_xz(ix,iz) - a%f_yz(iy,iz) & 
+               - a%f_x(ix) - a%f_y(iy) - a%f_z(iz) - a%f_empty
        ENDDO; ENDDO 
-       data = data(:,:) - an%f_empty  
-       an%si(DTOT) = an%si(DTOT) + ( SUM(data * data) ) / nyxz
-       an%si(DYXZ) = an%si(DYXZ) + ( SUM(an%f_yxz(:,ix,:)*an%f_yxz(:,ix,:)) ) / nyxz
+       data = data(:,:) - a%f_empty  
+       a%si(DTOT) = a%si(DTOT) + ( SUM(data * data) ) / nyxz
+       a%si(DYXZ) = a%si(DYXZ) + ( SUM(a%f_yxz(:,ix,:)*a%f_yxz(:,ix,:)) ) / nyxz
     ENDDO
 
-    an%si(DX)  = SUM(an%f_x*an%f_x)/nx 
-    an%si(DY)  = SUM(an%f_y*an%f_y)/ny
-    an%si(DZ)  = SUM(an%f_z*an%f_z)/nz
-    an%si(DYX) = SUM(an%f_yx*an%f_yx)/nyx
-    an%si(DYZ) = SUM(an%f_yz*an%f_yz)/nyz 
-    an%si(DXZ) = SUM(an%f_xz*an%f_xz)/nxz  
-    an%si_residual = an%si(DTOT) - an%si(DYXZ)-an%si(DYX)-an%si(DYZ)-an%si(DXZ)-an%si(DX)-an%si(DY)-an%si(DZ) 
+    a%si(DX)  = SUM(a%f_x*a%f_x)/nx 
+    a%si(DY)  = SUM(a%f_y*a%f_y)/ny
+    a%si(DZ)  = SUM(a%f_z*a%f_z)/nz
+    a%si(DYX) = SUM(a%f_yx*a%f_yx)/nyx
+    a%si(DYZ) = SUM(a%f_yz*a%f_yz)/nyz 
+    a%si(DXZ) = SUM(a%f_xz*a%f_xz)/nxz  
+    a%si_residual = a%si(DTOT) - a%si(DYXZ)-a%si(DYX)-a%si(DYZ)-a%si(DXZ)-a%si(DX)-a%si(DY)-a%si(DZ) 
 
-    IF ( ABS ( an%si_residual/an%si(DTOT)  ) .GT. 1e-6 ) THEN 
-       WRITE(STDOUT,*) 'ANOVA_DECOMP3D: VARIANCE DECOMPOSITION FAILED, RESIDUAL:', an%si_residual
+    IF ( ABS ( a%si_residual/a%si(DTOT)  ) .GT. 1e-6 ) THEN 
+       WRITE(STDOUT,*) 'ANOVA_DECOMP3D: VARIANCE DECOMPOSITION FAILED, RESIDUAL:', a%si_residual
        STOP 'ANOVA_DECOMP3D: VARIANCE DECOMPOSITION FAILED' 
     ELSEIF ( ncrw_verbose ) THEN 
-       WRITE(STDOUT,*) 'ANOVA_DECOMP3D: VARIANCE DECOMPOSED TO WITHIN', ABS(an%si_residual) / an%si(DTOT)  
+       WRITE(STDOUT,*) 'ANOVA_DECOMP3D: VARIANCE DECOMPOSED TO WITHIN', ABS(a%si_residual) / a%si(DTOT)  
     ENDIF  
 104 FORMAT(A30,1x,G10.3) 
     !  
@@ -348,29 +413,29 @@ MODULE ANOVA
     chk_yx_vs_yz=0.; chk_yx_vs_xz=0.; chk_yz_vs_xz=0.; 
     DO ix=1,nx 
        DO iy=1,ny; 
-          chk_x_vs_y = chk_x_vs_y  +an%f_x(ix)*an%f_y(iy); 
-          chk_x_vs_yx = chk_x_vs_yx+an%f_x(ix)*an%f_yx(iy,ix)  
-          chk_y_vs_yx = chk_y_vs_yx+an%f_y(iy)*an%f_yx(iy,ix)
+          chk_x_vs_y = chk_x_vs_y  +a%f_x(ix)*a%f_y(iy); 
+          chk_x_vs_yx = chk_x_vs_yx+a%f_x(ix)*a%f_yx(iy,ix)  
+          chk_y_vs_yx = chk_y_vs_yx+a%f_y(iy)*a%f_yx(iy,ix)
           DO iz=1,nz  
-             chk_z_vs_yx = chk_z_vs_yx + an%f_z(iz)*an%f_yx(iy,ix) 
-             chk_x_vs_yz = chk_x_vs_yz + an%f_x(ix)*an%f_yz(iy,iz) 
-             chk_y_vs_xz = chk_y_vs_xz + an%f_y(iy)*an%f_xz(ix,iz) 
-             chk_yx_vs_yz= chk_yx_vs_yz+ an%f_yx(iy,ix)*an%f_yz(iy,iz)  
-             chk_yx_vs_xz= chk_yx_vs_xz+ an%f_yx(iy,ix)*an%f_xz(ix,iz) 
-             chk_yz_vs_xz= chk_yz_vs_xz+ an%f_yz(iy,iz)*an%f_xz(ix,iz) 
+             chk_z_vs_yx = chk_z_vs_yx + a%f_z(iz)*a%f_yx(iy,ix) 
+             chk_x_vs_yz = chk_x_vs_yz + a%f_x(ix)*a%f_yz(iy,iz) 
+             chk_y_vs_xz = chk_y_vs_xz + a%f_y(iy)*a%f_xz(ix,iz) 
+             chk_yx_vs_yz= chk_yx_vs_yz+ a%f_yx(iy,ix)*a%f_yz(iy,iz)  
+             chk_yx_vs_xz= chk_yx_vs_xz+ a%f_yx(iy,ix)*a%f_xz(ix,iz) 
+             chk_yz_vs_xz= chk_yz_vs_xz+ a%f_yz(iy,iz)*a%f_xz(ix,iz) 
           ENDDO
        ENDDO
        DO iz=1,nz
-          chk_x_vs_z = chk_x_vs_z + an%f_x(ix)*an%f_z(iz); 
-          chk_x_vs_xz= chk_x_vs_xz+ an%f_x(ix)*an%f_xz(ix,iz); 
-          chk_z_vs_xz= chk_z_vs_xz+ an%f_z(iz)*an%f_xz(ix,iz); 
+          chk_x_vs_z = chk_x_vs_z + a%f_x(ix)*a%f_z(iz); 
+          chk_x_vs_xz= chk_x_vs_xz+ a%f_x(ix)*a%f_xz(ix,iz); 
+          chk_z_vs_xz= chk_z_vs_xz+ a%f_z(iz)*a%f_xz(ix,iz); 
        ENDDO
     ENDDO
     DO iy=1,ny 
        DO iz=1,nz 
-          chk_y_vs_z = chk_y_vs_z + an%f_y(iy)*an%f_z(iz) 
-          chk_y_vs_yz= chk_y_vs_yz+ an%f_y(iy)*an%f_yz(iy,iz) 
-          chk_z_vs_yz= chk_z_vs_yz+ an%f_z(iz)*an%f_yz(iy,iz) 
+          chk_y_vs_z = chk_y_vs_z + a%f_y(iy)*a%f_z(iz) 
+          chk_y_vs_yz= chk_y_vs_yz+ a%f_y(iy)*a%f_yz(iy,iz) 
+          chk_z_vs_yz= chk_z_vs_yz+ a%f_z(iz)*a%f_yz(iy,iz) 
        ENDDO 
     ENDDO
 
@@ -394,19 +459,19 @@ MODULE ANOVA
          chk_yx_vs_yz, chk_yx_vs_xz, chk_yz_vs_xz,chk_x_vs_z,chk_x_vs_xz,chk_z_vs_xz,chk_y_vs_z,& 
          chk_y_vs_yz,chk_z_vs_yz/) )
 
-    IF ( max_err /an%si(DTOT)  .GT. SQRT(SMALL_DELTA) ) THEN 
-       WRITE(*,*) 'ANOVA_DECOMP3D: Orthogonality of ANOVA decomposition violated by', max_err /an%si(DTOT)
+    IF ( max_err /a%si(DTOT)  .GT. SQRT(SMALL_DELTA) ) THEN 
+       WRITE(*,*) 'ANOVA_DECOMP3D: Orthogonality of ANOVA decomposition violated by', max_err /a%si(DTOT)
        STOP 'ANOVA_DECOMP3D: ORTHOGONALITY VIOLATED'
     ENDIF
 
     IF ( ncrw_verbose ) THEN 
-       WRITE(*,*) 'ANOVA_DECOMP3D: GLOBAL AVERAGE:', an%f_empty 
-!       WRITE(*,*) 'YZ:',SUM(an%f_yz*an%f_yz)/nyz, MINVAL(an%f_yz),MAXVAL(an%f_yz), SUM(an%f_yz)/nyz,nyz
-!       WRITE(*,*) 'YX:',SUM(an%f_yx*an%f_yx)/nyx, MINVAL(an%f_yx),MAXVAL(an%f_yx), SUM(an%f_yx)/nyx,nyx
-!       WRITE(*,*) 'XZ:',SUM(an%f_xz*an%f_xz)/nxz, MINVAL(an%f_xz),MAXVAL(an%f_xz), SUM(an%f_xz)/nxz,nxz
-!       WRITE(*,*) 'X: ',SUM(an%f_x*an%f_x)/nx, MINVAL(an%f_x),MAXVAL(an%f_x),      SUM(an%f_x)/nx,  nx
-!       WRITE(*,*) 'Y: ',SUM(an%f_y*an%f_y)/ny, MINVAL(an%f_y),MAXVAL(an%f_y),      SUM(an%f_y)/ny,  ny
-!       WRITE(*,*) 'Z: ',SUM(an%f_z*an%f_z)/nz, MINVAL(an%f_z),MAXVAL(an%f_z),      SUM(an%f_z)/nz,  nz  
+       WRITE(*,*) 'ANOVA_DECOMP3D: GLOBAL AVERAGE:', a%f_empty 
+!       WRITE(*,*) 'YZ:',SUM(a%f_yz*a%f_yz)/nyz, MINVAL(a%f_yz),MAXVAL(a%f_yz), SUM(a%f_yz)/nyz,nyz
+!       WRITE(*,*) 'YX:',SUM(a%f_yx*a%f_yx)/nyx, MINVAL(a%f_yx),MAXVAL(a%f_yx), SUM(a%f_yx)/nyx,nyx
+!       WRITE(*,*) 'XZ:',SUM(a%f_xz*a%f_xz)/nxz, MINVAL(a%f_xz),MAXVAL(a%f_xz), SUM(a%f_xz)/nxz,nxz
+!       WRITE(*,*) 'X: ',SUM(a%f_x*a%f_x)/nx, MINVAL(a%f_x),MAXVAL(a%f_x),      SUM(a%f_x)/nx,  nx
+!       WRITE(*,*) 'Y: ',SUM(a%f_y*a%f_y)/ny, MINVAL(a%f_y),MAXVAL(a%f_y),      SUM(a%f_y)/ny,  ny
+!       WRITE(*,*) 'Z: ',SUM(a%f_z*a%f_z)/nz, MINVAL(a%f_z),MAXVAL(a%f_z),      SUM(a%f_z)/nz,  nz  
 !       WRITE(*,*) ''
        WRITE(*,*) 'ANOVA_DECOMP3D: ORTHOGONALITY OF COMPONENTS ACHIEVED (MAXIMUM ERROR:',max_err,')'
 !        WRITE(*,*) 'X VS Y  ', chk_x_vs_y, SQRT(d_arr(DX)*d_arr(DY))
@@ -425,6 +490,8 @@ MODULE ANOVA
 !        WRITE(*,*) 'YX VS XZ ', chk_yx_vs_xz,SQRT(d_arr(DYX)*d_arr(DXZ)) 
 !        WRITE(*,*) 'YZ VS XZ ', chk_yz_vs_xz,SQRT(d_arr(DYZ)*d_arr(DXZ)) 
     ENDIF 
+
+    CALL GET_SORT_INDICES(DLAST,a%si,a%si_order)
 
     CALL TIMER_FINISH('ANOVA_DECOMP3D: STEP2 Time elapse') 
 
@@ -445,7 +512,9 @@ MODULE ANOVA
     a%nz=ncrw_getdimlen(zdim);  a%zdim=zdim; nz=a%nz 
     a%nt=ncrw_getdimlen(tdim);  a%tdim=tdim; nt=a%nt
     
-
+    CALL ANOVA_SETDIMSTR(a) 
+    ALLOCATE(a%si_order(DLAST)) 
+ 
     IF ( ndim .GE. 3 ) THEN 
        ALLOCATE(a%f_x(nx), a%f_y(ny), a%f_z(nz)) 
        ALLOCATE(a%f_xz(nx,nz), a%f_yz(ny,nz), a%f_yx(ny,nx))
@@ -514,7 +583,7 @@ MODULE ANOVA
     ALLOCATE(avg_yx(nz,nt),avg_yz(nx,nt),avg_yt(nx,nz),avg_xz(ny,nt),avg_xt(ny,nz),avg_zt(ny,nx))  
     ALLOCATE(avg_x(ny,nz,nt), avg_y(nx,nz,nt), avg_z(ny,nx,nt),avg_t(ny,nx,nz)) 
     ALLOCATE(data(ny,nz),f_yxzt(ny,nz)) 
-    
+
     CALL TIMER_FINISH('ANOVA_DECOMP4D: INIT time elapse') 
 
     CALL TIMER_START() 
@@ -677,6 +746,7 @@ MODULE ANOVA
        STOP 'ERROR: ANOVA_DECOMP4D VARIANCE NOT DECOMPOSED'
     ENDIF
 
+    CALL GET_SORT_INDICES(DLAST,a%si,a%si_order)
 
     CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP2 Time elapse') 
 
