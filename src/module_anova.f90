@@ -257,13 +257,17 @@ MODULE ANOVA
 ! ANOVA 3D - variance decomposition and sensitivity indices 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  SUBROUTINE ANOVA_DECOMP3D(vname,xdim,ydim,zdim,fixed_dim,fixed_pos,a) 
+  SUBROUTINE ANOVA_DECOMP3D(vname,fixed_pos,a)
+
+    USE NC_READWRITE, ONLY : NCRW_MAXDIMLEN
 
     IMPLICIT NONE 
 
     INTEGER,          INTENT(IN) :: fixed_pos
-    CHARACTER(LEN=*), INTENT(IN) :: vname,xdim,ydim,zdim,fixed_dim 
+    CHARACTER(LEN=*), INTENT(IN) :: vname
     TYPE(T_ANOVA)                :: a
+
+    CHARACTER(LEN=NCRW_MAXDIMLEN)             :: xdim,ydim,zdim,fixed_dim
 
     REAL(KIND=8)                              :: avg_yxz,rdum               !,f_empty
     REAL(KIND=8), DIMENSION(:),   ALLOCATABLE :: avg_yx, avg_yz,avg_xz      !,f_x,f_y,f_z  
@@ -271,6 +275,7 @@ MODULE ANOVA
     ! REAL(KIND=8), DIMENSION(:,:), ALLOCATABLE ::                            !f_yxz
     INTEGER,      DIMENSION(2)                :: pos 
     CHARACTER,    DIMENSION(2)                :: yz_dims*32,xt_dims*32  
+
 
     INTEGER :: ix,iy,iz
     INTEGER :: nx,ny,nz,nt,nyz,nyx,nxz,nyxz 
@@ -280,7 +285,12 @@ MODULE ANOVA
     REAL :: chk_yx_vs_yz, chk_yx_vs_xz, chk_yz_vs_xz 
     REAL :: max_err 
 
-    CALL TIMER_START() 
+    CALL TIMER_START()
+
+    xdim=a%xdim
+    ydim=a%ydim
+    zdim=a%zdim
+    fixed_dim=a%tdim
 
     nx=ncrw_getdimlen(xdim);      a%nx=nx
     ny=ncrw_getdimlen(ydim);      a%ny=ny 
@@ -536,10 +546,13 @@ MODULE ANOVA
   ! ANOVA 4D - Variance decomposition and sensitivity indices 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  
 
-  SUBROUTINE ANOVA_DECOMP4D(vname,si_res,xdim,ydim,zdim,tdim,a) 
-    IMPLICIT NONE 
+  SUBROUTINE ANOVA_DECOMP4D(vname,si_res,a)
 
-    CHARACTER(LEN=*), INTENT(IN) :: vname,xdim,ydim,zdim,tdim 
+    USE NC_READWRITE, ONLY : NCRW_MAXDIMLEN
+
+    IMPLICIT NONE
+
+    CHARACTER(LEN=*), INTENT(IN) :: vname
     REAL(KIND=8)                                :: si_res   
     TYPE(T_ANOVA) :: a
     ! 
@@ -554,6 +567,8 @@ MODULE ANOVA
     INTEGER,      DIMENSION(2)                  :: pos 
     CHARACTER,    DIMENSION(2)                  :: yz_dims*32,xt_dims*32  
 
+    CHARACTER(LEN=NCRW_MAXDIMLEN) :: xdim,ydim,zdim,tdim
+
     INTEGER :: ix,iy,iz,it 
     INTEGER :: nx,ny,nz,nt
     INTEGER :: nyz,nyx,nyt,nxz,nxt,nzt
@@ -561,6 +576,11 @@ MODULE ANOVA
     INTEGER :: nyxzt 
 
     CALL TIMER_START()
+
+    xdim=a%xdim
+    ydim=a%ydim
+    zdim=a%zdim
+    tdim=a%tdim
 
     nx=a%nx!ncrw_getdimlen(xdim);
     ny=a%ny!ncrw_getdimlen(ydim);

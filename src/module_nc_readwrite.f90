@@ -8,7 +8,10 @@ MODULE nc_readwrite
   IMPLICIT NONE  
   SAVE 
 
-  INTEGER, PARAMETER :: NCRW_MAXVAR=128, NCRW_MAXDIM=20,NCRW_MAXATT=128
+  INTEGER, PARAMETER :: NCRW_MAXVAR=128,&
+       NCRW_MAXDIM=20,&
+       NCRW_MAXATT=128,&
+       NCRW_MAXDIMLEN=32
   
   INTEGER :: ncrw_id  
   INTEGER :: ncrw_ndim, ncrw_nvar, ncrw_natt
@@ -19,13 +22,14 @@ MODULE nc_readwrite
   REAL(KIND=8),DIMENSION(NCRW_MAXVAR)             :: ncrw_varscale,ncrw_varoffset
   CHARACTER,   DIMENSION(NCRW_MAXVAR)             :: ncrw_varnames*32
   CHARACTER,   DIMENSION(NCRW_MAXVAR,NCRW_MAXDIM) :: ncrw_vardimnames*32  
-  INTEGER,     DIMENSION(NCRW_MAXVAR,NCRW_MAXATT):: ncrw_varatttypes,ncrw_varattlen
-  CHARACTER,   DIMENSION(NCRW_MAXVAR,NCRW_MAXATT):: ncrw_varattnames*32
+  INTEGER,     DIMENSION(NCRW_MAXVAR,NCRW_MAXATT) :: ncrw_varatttypes,ncrw_varattlen
+  CHARACTER,   DIMENSION(NCRW_MAXVAR,NCRW_MAXATT) :: ncrw_varattnames*32
 
   INTEGER,     DIMENSION(NCRW_MAXDIM)             :: ncrw_dimlen
   CHARACTER,   DIMENSION(NCRW_MAXDIM)             :: ncrw_dimnames*32
 
   LOGICAL :: ncrw_verbose
+  LOGICAL :: ncrw_initialized=.FALSE.
 
   REAL(KIND=8),DIMENSION(:,:), ALLOCATABLE        :: ncrw_grid
 
@@ -33,17 +37,22 @@ MODULE nc_readwrite
 
 CONTAINS 
   
-  SUBROUTINE ncrw_init(fname,verbose) 
+  SUBROUTINE ncrw_init(fname,verbose)
+
+    IMPLICIT NONE
+
     CHARACTER(LEN=*) fname
     INTEGER :: idim, ivar, iatt, idum
-    INTEGER, OPTIONAL :: verbose 
+    INTEGER, OPTIONAL :: verbose
+
+    IF ( ncrw_initialized .EQV. .TRUE. )  &
+         STOP 'ERROR nc_read_write ERROR: nc_readwrite already initialized'
 
     ncrw_verbose = .FALSE. 
     IF ( present(verbose) ) THEN  
        IF ( verbose .GT. 0 ) ncrw_verbose = .TRUE.  
     ENDIF
-    
-    
+
     CALL check ( nf90_open(fname,NF90_NOWRITE, ncrw_id) ) 
     CALL check ( nf90_inquire(ncrw_id,nDimensions=ncrw_ndim, &
          nVariables=ncrw_nvar,nAttributes=ncrw_natt) )
@@ -112,6 +121,8 @@ CONTAINS
           STOP 'ERROR INITIALIZING VARIABLES' 
        END IF
     ENDDO
+
+    ncrw_initialized = .TRUE.
 
     IF ( ncrw_verbose ) WRITE(*,*) '=========== FINISHED ncrw_init' 
 

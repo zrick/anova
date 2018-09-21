@@ -13,7 +13,8 @@ PROGRAM ANOVA_MAIN
   INTEGER :: ivar,idim,i,j,nx,ny,nz,nt 
   CHARACTER nc_filename_input*128 
   CHARACTER :: vname*128,outbase*256
-  CHARACTER(LEN=20) :: xdim,ydim,zdim,tdim,dummy
+  CHARACTER(LEN=20) :: xdim,    ydim,    zdim,    tdim,    dummy
+  CHARACTER(LEN=20) :: xdim_loc,ydim_loc,zdim_loc,tdim_loc
   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: d_arr  
   REAL(KIND=8) :: si_residual
   REAL :: si_max 
@@ -44,26 +45,38 @@ PROGRAM ANOVA_MAIN
 
   CALL ncrw_init(nc_filename_input,verbose)
 
-  IF ( ncrw_inq_dimtranspose(vname,ydim,zdim) ) THEN 
-     WRITE(*,*) 'WARNING (ANOVA_MAIN): ', 'Need to exchange ', TRIM(ydim),' and ',TRIM(zdim), ' to avoid tranposition' 
-     dummy=zdim 
-     zdim=ydim 
-     ydim=dummy
-  ENDIF
 
   write_decomp(:) = .TRUE. 
 
 
-  ! INITIALIZE, CALCULATE AND OUTPUT 3D ANOVA 
-  CALL ANOVA_INIT(vname,xdim,ydim,zdim,tdim,anova3,3) 
-  CALL ANOVA_DECOMP3D(vname,xdim,ydim,zdim,tdim,fixed_pos,anova3)  
-  outbase=TRIM(vname)//'.si3d'
-  CALL ANOVA_OUTPUT_ASC(anova3,outbase)  
+  ! INITIALIZE, CALCULATE AND OUTPUT 3D ANOVA
+  IF ( ncrw_inq_dimtranspose(vname,xdim,ydim) ) THEN
+     WRITE(*,*) 'WARNING (ANOVA_MAIN): ', 'Exchanging ', &
+          TRIM(xdim),' and ',TRIM(ydim), ' to avoid tranposition'
+     tdim_loc=tdim; xdim_loc=ydim; ydim_loc=xdim; zdim_loc=zdim
+  ELSE
+     tdim_loc=tdim; xdim_loc=xdim; ydim_loc=ydim; zdim_loc=zdim
+  ENDIF
+  !
+  CALL ANOVA_INIT(vname,tdim_loc,xdim_loc,ydim_loc,zdim_loc,anova3,3)
+  CALL ANOVA_DECOMP3D(vname,fixed_pos,anova3)
+  WRITE(outbase,*) fixed_pos
+  outbase=TRIM(vname)//'.si3d.'//TRIM(zdim_loc)//TRIM(ADJUSTL(outbase))
+  CALL ANOVA_OUTPUT_ASC(anova3,outbase)
   outbase=TRIM(vname)//'.anova3d.'
-  CALL ANOVA_OUTPUT_BIN(anova3,outbase,write_decomp) 
+  CALL ANOVA_OUTPUT_BIN(anova3,outbase,write_decomp)
 
-  CALL ANOVA_INIT(vname,xdim,ydim,zdim,tdim,anova4,4) 
-  CALL ANOVA_DECOMP4D(vname,si_residual,xdim,ydim,zdim,tdim,anova4)  
+  ! INITIALIZE, CALCULATE AND OUTPUT 4D ANOVA
+  IF ( ncrw_inq_dimtranspose(vname,ydim,zdim) ) THEN
+     WRITE(*,*) 'WARNING (ANOVA_MAIN): ', 'Exchanging ', &
+          TRIM(ydim),' and ',TRIM(zdim), ' to avoid tranposition'
+     xdim_loc=xdim; ydim_loc=zdim; zdim_loc=ydim; tdim_loc=tdim
+  ELSE
+     xdim_loc=xdim; ydim_loc=ydim; zdim_loc=zdim; tdim_loc=tdim
+  ENDIF
+  !
+  CALL ANOVA_INIT(vname,xdim_loc,ydim_loc,zdim_loc,tdim_loc,anova4,4)
+  CALL ANOVA_DECOMP4D(vname,si_residual,anova4)
   outbase=TRIM(vname)//'.si4d'
   CALL ANOVA_OUTPUT_ASC(anova4,outbase)
   outbase=TRIM(vname)//'.anova4d.'
