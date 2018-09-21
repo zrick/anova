@@ -215,9 +215,9 @@ MODULE ANOVA
 
     OPEN(funit,FILE=fname,form='FORMATTED') 
 
-    WRITE(funit,106) 'DIM', 'VARIANCE', 'SENSITIVITY','SENSITIVITY-2' 
     WRITE(funit,104) 'TOTAL VAR',   a%si(Dtot),1.0 
     WRITE(funit,104) 'RESIDUAL VAR',a%si_residual,a%si_residual/a%si(DTOT)  
+    WRITE(funit,106) 'DIM', 'VARIANCE', 'SENSITIVITY','SENSITIVITY-2'
 
     DO i=2,DLAST  
        IF(len(TRIM(a%si_tag(i))) .GT. 0) & 
@@ -226,9 +226,9 @@ MODULE ANOVA
     ENDDO
   ! 
     CLOSE(funit) 
-106 FORMAT('#',a3,';',a9,  ';',a11,';',a13)
-105 FORMAT(a15,';',g10.3,';',g11.3'%;',g11.3,'%;') 
-104 FORMAT(a15,';',g10.3,';',g11.3';') 
+106 FORMAT('#',a14,';',a10,  ';',a12,';',a14)
+105 FORMAT(a15,';',g11.4,';',g12.4'%;',g12.4,'%;')
+104 FORMAT('#',a14,';',g11.4,';',g12.4';')
   END SUBROUTINE ANOVA_OUTPUT_ASC
 
 
