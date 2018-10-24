@@ -761,7 +761,7 @@ MODULE ANOVA
          - a%si(DYXZ)-a%si(DYXT)-a%si(DYZT)-a%si(DXZT) & 
          - a%si(DYXZT)
 
-    IF ( a%si_residual .GT. SMALL_DELTA ) THEN 
+    IF ( a%si_residual/a%si(DTOT) .GT. SMALL_DELTA ) THEN 
        WRITE(*,*) 'ANOVA_DECOMP4D: RESIDUAL VARIANCE', a%si_residual, 'GLOBAL AVG:',a%f_empty 
        STOP 'ERROR: ANOVA_DECOMP4D VARIANCE NOT DECOMPOSED'
     ENDIF
