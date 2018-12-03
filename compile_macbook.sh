@@ -1,6 +1,6 @@
 #!/bin/bash -ex
 
-F90=gfortran-mp-5
+F90=gfortran-mp-8
 NC_INC=/opt/local/include
 NC_LIB=/opt/local/lib
 DBG=

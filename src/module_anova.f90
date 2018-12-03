@@ -192,6 +192,7 @@ MODULE ANOVA
     
     
   END SUBROUTINE ANOVA_OUTPUT_BIN
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! ANOVA ASCII OUTPUT 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
@@ -230,6 +231,44 @@ MODULE ANOVA
 105 FORMAT(a15,';',g11.4,';',g12.4'%;',g12.4,'%;')
 104 FORMAT('#',a14,';',g11.4,';',g12.4';')
   END SUBROUTINE ANOVA_OUTPUT_ASC
+
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! ANOVA ASCII OUTPUT FOR PROFILES
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
+  SUBROUTINE ANOVA_OUTPUT_ASCP(a,fname,p)    
+    
+    IMPLICIT NONE  
+
+    ! PARAMETERS 
+    TYPE(T_ANOVA),                    INTENT(IN) :: a  
+    REAL(KIND=8),  DIMENSION(DLAST,*),INTENT(IN) :: p 
+    CHARACTER(LEN=*),                 INTENT(IN) :: fname  
+
+    ! LOCAL DEFINITIONS 
+    INTEGER,       PARAMETER :: funit=27 
+    INTEGER                  :: i
+    REAL(KIND=8)             :: si_max 
+
+    IF ( a%ndim.LT.3 .OR. a%ndim .GT. 4 ) & 
+       STOP 'ANOVA NOT IMPLEMENTED FOR LESS THAN 3 OR MORE THAN 4 DIMENSIONS' 
+
+    si_max=MAXVAL(a%si(2:DLAST))
+
+    OPEN(funit,FILE=fname,form='FORMATTED') 
+
+    WRITE(funit,108) a%si_tag((/1,3,7,8,10,13,14,15/))
+
+    DO i=1,a%nt
+       WRITE(funit,107) i,p( (/1,3,7,8,10,13,14,15 /), i)
+    ENDDO
+  ! 
+    CLOSE(funit) 
+108 Format('LEVEL;',8(A11,  ';'))
+107 FORMAT(I5';',   8(G11.4,';')) 
+  END SUBROUTINE ANOVA_OUTPUT_ASCP
 
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -508,10 +547,10 @@ MODULE ANOVA
   END SUBROUTINE ANOVA_DECOMP3D   
 
 
-  SUBROUTINE ANOVA_INIT(vname,xdim,ydim,zdim,tdim,a,ndim)   
+  SUBROUTINE ANOVA_INIT(xdim,ydim,zdim,tdim,a,ndim)   
     IMPLICIT NONE
 
-    CHARACTER(LEN=*), INTENT(IN) :: vname,xdim,ydim,zdim,tdim   
+    CHARACTER(LEN=*), INTENT(IN) :: xdim,ydim,zdim,tdim   
     INTEGER,          INTENT(IN) :: ndim
     INTEGER :: nx,ny,nz,nt 
     TYPE(T_ANOVA) :: a 
@@ -672,7 +711,7 @@ MODULE ANOVA
        IF ( ncrw_verbose ) & 
             WRITE(*,*) 'ANOVA_DECOMP4D: STEP 1 FINISHED, INTEGRAL CALCULUS CONSISTENT' 
     ENDIF
-    CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP1 time elapse') 
+    CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP 1 time elapse') 
     CALL TIMER_START() 
 
 
@@ -768,7 +807,7 @@ MODULE ANOVA
 
     CALL GET_SORT_INDICES(DLAST,a%si,a%si_order)
 
-    CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP2 Time elapse') 
+    CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP 2 Time elapse') 
 
     RETURN 
 
