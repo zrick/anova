@@ -13,7 +13,7 @@ PROGRAM ANOVA_MAIN
   INTEGER :: ivar,iarg,idim,i,j,nx,ny,nz,nt,nvar,narg
   CHARACTER nc_filename_input*128 
   CHARACTER :: vname*128,outbase*256
-  CHARACTER(LEN=20) :: dim1,    dim2,    dim3,    dim4,    dummy
+  CHARACTER(LEN=20) :: dim1,    dim2,    dim3,    dim4,    dummy, trange
   CHARACTER(LEN=20) :: xdim_loc,ydim_loc,zdim_loc,tdim_loc 
   CHARACTER(LEN=64), DIMENSION(:), ALLOCATABLE :: var_list 
   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: d_arr  
@@ -63,7 +63,7 @@ PROGRAM ANOVA_MAIN
      xdim_loc=dim1; ydim_loc=dim2; zdim_loc=dim3; tdim_loc=dim4
   ENDIF 
   WRITE(*,*) 'INITIALIZING 3D ANOVA' 
-  CALL ANOVA_INIT(xdim_loc,ydim_loc,zdim_loc,tdim_loc,anova3,3)  
+  CALL ANOVA_INIT(xdim_loc,ydim_loc,zdim_loc,tdim_loc,anova3,3,1,5)  
   ! 
   fixed_len=ncrw_getdimlen(tdim_loc)
   ALLOCATE(si_prof(DLAST,fixed_len))
@@ -88,13 +88,13 @@ PROGRAM ANOVA_MAIN
      xdim_loc=dim1; ydim_loc=dim2; zdim_loc=dim3; tdim_loc=dim4
   ENDIF
 
-  CALL ANOVA_INIT(xdim_loc,ydim_loc,zdim_loc,tdim_loc,anova4,4,1,20)
+  CALL ANOVA_INIT(xdim_loc,ydim_loc,zdim_loc,tdim_loc,anova4,4,5,20)
   DO ivar=1,nvar 
-     vname=var_list(ivar) 
+     vname=var_list(ivar)  
      CALL ANOVA_DECOMP4D(vname,si_residual,anova4)
      outbase=TRIM(vname)//'.si4d'
      CALL ANOVA_OUTPUT_ASC(anova4,outbase)
-     outbase=TRIM(vname)//'.anova4d.'
+     outbase=TRIM(vname)//'.anova4d'
      CALL ANOVA_OUTPUT_BIN(anova4,outbase,write_decomp)
   ENDDO
 

@@ -9,7 +9,7 @@ MODULE ANOVA
   TYPE T_ANOVA 
      INTEGER :: nx,ny,nz,nt,ndim
      INTEGER :: nt_sub,it_srt,it_end
-     CHARACTER(LEN=20)                               :: xdim,ydim,zdim,tdim,vname
+     CHARACTER(LEN=20)                               :: xdim,ydim,zdim,tdim,vname,trange
      CHARACTER(LEN=20)                               :: fname 
      REAL(KIND=8)                                    :: f_empty,si_residual
      REAL(KIND=8),      DIMENSION(:),    ALLOCATABLE :: f_x,f_y,f_z,f_t 
@@ -105,32 +105,43 @@ MODULE ANOVA
     INTEGER, PARAMETER :: funit=28  
     INTEGER :: nd,t0,t1
     CHARACTER(LEN=*) :: fbase
-    CHARACTER(LEN=200) :: fname 
+    CHARACTER(LEN=200) :: fname, fbase_loc
 
     xdim=a%xdim(:3); ydim=a%ydim(:3); zdim=a%zdim(:3); tdim=a%tdim(:3) 
     nd=a%ndim
     t0=a%it_srt
     t1=a%it_end
+    
+    WRITE(*,*) 'OUTPUT_BIN:', a%it_srt,a%it_end,a%nt_sub,a%nt,a%trange 
+
+    IF ( a%it_srt .NE. 1 .OR. a%nt_sub .NE. a%nt) THEN 
+       fbase_loc = TRIM(fbase) // TRIM(a%trange) // '.' 
+    ELSE 
+       fbase_loc = TRIM(fbase) // '.' 
+    ENDIF
+
+    WRITE(*,*) TRIM(fbase),'|',TRIM(fbase_loc),'|',TRIM(a%trange)
+
     IF ( wrt(DX) .EQV. .TRUE. ) THEN   
-       fname=TRIM(fbase)//TRIM(xdim)
+       fname=TRIM(fbase_loc)//TRIM(xdim)
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_x(:) 
        CLOSE(funit)
     ENDIF
     IF ( wrt(DY) .EQV. .TRUE. ) THEN   
-       fname=TRIM(fbase)//TRIM(ydim)
+       fname=TRIM(fbase_loc)//TRIM(ydim)
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_y(:) 
        CLOSE(funit) 
     ENDIF
     IF ( wrt(DZ) .EQV. .TRUE. ) THEN   
-       fname=TRIM(fbase)//TRIM(zdim)
+       fname=TRIM(fbase_loc)//TRIM(zdim)
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_z(:) 
        CLOSE(funit) 
     ENDIF
     IF ( wrt(DT) .EQV. .TRUE. .AND. nd .GT. 3) THEN   
-       fname=TRIM(fbase)//TRIM(tdim)
+       fname=TRIM(fbase_loc)//TRIM(tdim)
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_t(t0:t1) 
        CLOSE(funit) 
@@ -139,32 +150,32 @@ MODULE ANOVA
     ! 2-DIMENSIONAL FIELDS 
     !
     IF ( wrt(DYX) .EQV. .TRUE. ) THEN 
-       fname=TRIM(fbase)//TRIM(ydim)//'_'//TRIM(xdim) 
+       fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(xdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_yx(:,:) 
     ENDIF
     IF ( wrt(DYZ) .EQV. .TRUE. ) THEN 
-       fname=TRIM(fbase)//TRIM(ydim)//'_'//TRIM(zdim) 
+       fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(zdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_yz(:,:) 
     ENDIF
     IF ( wrt(DYT) .EQV. .TRUE. .AND. nd .GT. 3) THEN 
-       fname=TRIM(fbase)//TRIM(ydim)//'_'//TRIM(tdim) 
+       fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_yt(:,t0:t1) 
     ENDIF
     IF ( wrt(DXZ) .EQV. .TRUE. ) THEN 
-       fname=TRIM(fbase)//TRIM(xdim)//'_'//TRIM(zdim) 
+       fname=TRIM(fbase_loc)//TRIM(xdim)//'_'//TRIM(zdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_xz(:,:) 
     ENDIF
     IF ( wrt(DXT) .EQV. .TRUE. .AND.nd.GT. 3) THEN 
-       fname=TRIM(fbase)//TRIM(xdim)//'_'//TRIM(tdim) 
+       fname=TRIM(fbase_loc)//TRIM(xdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_xt(:,t0:t1) 
     ENDIF
     IF ( wrt(DZT) .EQV. .TRUE. .AND.nd.GT.3) THEN 
-       fname=TRIM(fbase)//TRIM(zdim)//'_'//TRIM(tdim) 
+       fname=TRIM(fbase_loc)//TRIM(zdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_zt(:,t0:t1) 
     ENDIF
@@ -172,22 +183,22 @@ MODULE ANOVA
     ! 3-DIMENSIONAL FIELDS 
     !
     IF ( wrt(DYXZ) .EQV. .TRUE. ) THEN 
-       fname=TRIM(fbase)//TRIM(ydim)//'_'//TRIM(xdim)//'_'//TRIM(zdim) 
+       fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(xdim)//'_'//TRIM(zdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_yxz(:,:,:) 
     ENDIF
     IF ( wrt(DYXT) .EQV. .TRUE. .AND. nd.GT.3) THEN 
-       fname=TRIM(fbase)//TRIM(ydim)//'_'//TRIM(xdim)//'_'//TRIM(tdim) 
+       fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(xdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_yxt(:,:,t0:t1) 
     ENDIF
     IF ( wrt(DYZT) .EQV. .TRUE. .AND. nd.GT.3) THEN 
-       fname=TRIM(fbase)//TRIM(ydim)//'_'//TRIM(zdim)//'_'//TRIM(tdim) 
+       fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(zdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_yzt(:,:,t0:t1) 
     ENDIF
     IF ( wrt(DXZT) .EQV. .TRUE. .AND. nd.GT.3) THEN 
-       fname=TRIM(fbase)//TRIM(xdim)//'_'//TRIM(zdim)//'_'//TRIM(tdim) 
+       fname=TRIM(fbase_loc)//TRIM(xdim)//'_'//TRIM(zdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_xzt(:,:,t0:t0) 
     ENDIF
@@ -198,18 +209,25 @@ MODULE ANOVA
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! ANOVA ASCII OUTPUT 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-  SUBROUTINE ANOVA_OUTPUT_ASC(a,fname)    
+  SUBROUTINE ANOVA_OUTPUT_ASC(a,fbase)    
     
     IMPLICIT NONE  
 
     ! PARAMETERS 
     TYPE(T_ANOVA), INTENT(IN):: a  
-
+    CHARACTER(LEN=*)         :: fbase
     ! LOCAL DEFINITIONS 
-    CHARACTER(LEN=*)         :: fname  
+    CHARACTER(LEN=200)       :: fname  
     INTEGER,       PARAMETER :: funit=27 
     INTEGER                  :: i
     REAL(KIND=8)             :: si_max 
+
+
+    IF ( a%it_srt .NE. 1 .OR. a%nt_sub .NE. a%nt ) THEN 
+       fname = TRIM(ADJUSTL(fbase)) // TRIM(ADJUSTL(a%trange)) 
+    ELSE 
+       fname = TRIM(ADJUSTL(fbase))
+    ENDIF
 
     IF ( a%ndim.LT.3 .OR. a%ndim .GT. 4 ) & 
        STOP 'ANOVA NOT IMPLEMENTED FOR LESS THAN 3 OR MORE THAN 4 DIMENSIONS' 
@@ -240,20 +258,23 @@ MODULE ANOVA
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! ANOVA ASCII OUTPUT FOR PROFILES
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-  SUBROUTINE ANOVA_OUTPUT_ASCP(a,fname,p)    
+  SUBROUTINE ANOVA_OUTPUT_ASCP(a,fbase,p)    
     
     IMPLICIT NONE  
 
     ! PARAMETERS 
     TYPE(T_ANOVA),                    INTENT(IN) :: a  
     REAL(KIND=8),  DIMENSION(DLAST,*),INTENT(IN) :: p 
-    CHARACTER(LEN=*),                 INTENT(IN) :: fname  
+    CHARACTER(LEN=*),                 INTENT(IN) :: fbase
 
     ! LOCAL DEFINITIONS 
     INTEGER,       PARAMETER :: funit=27 
     INTEGER                  :: i
     REAL(KIND=8)             :: si_max 
+    CHARACTER(LEN=200)       :: fname 
 
+    fname = TRIM(TRIM(ADJUSTL(fbase)) // a%trange )
+ 
     IF ( a%ndim.LT.3 .OR. a%ndim .GT. 4 ) & 
        STOP 'ANOVA NOT IMPLEMENTED FOR LESS THAN 3 OR MORE THAN 4 DIMENSIONS' 
 
@@ -578,6 +599,15 @@ MODULE ANOVA
        STOP 'ERROR' 
     ENDIF
     !
+     IF ( a%it_srt .NE. 1 .OR. a%nt_sub .NE. a%nt ) THEN  
+        WRITE(a%trange,109) a%it_srt,a%it_end 
+        a%trange = '.'//TRIM(ADJUSTL(a%tdim))//TRIM(ADJUSTL(a%trange))
+109     FORMAT(I4.4,'-',I4.4)
+     ELSE 
+        a%trange = '' 
+     ENDIF
+
+
     WRITE(*,*) 'ANOVA_DECOMP4D: processing t from', a%it_srt, ' to ', a%it_end, '(', a%nt_sub, ')'
     !
     CALL ANOVA_SETDIMSTR(a) 
