@@ -20,7 +20,7 @@ PROGRAM ANOVA_MAIN
   REAL(KIND=8) :: si_residual
   REAL(KIND=8), DIMENSION(:,:),ALLOCATABLE :: si_prof 
   REAL :: si_max 
-  INTEGER :: fixed_pos, fixed_len
+  INTEGER :: fixed_pos, fixed_len, it_srt, it_end
   INTEGER, PARAMETER :: verbose =0
   LOGICAL, DIMENSION(DLAST) :: write_decomp
   
@@ -58,9 +58,9 @@ PROGRAM ANOVA_MAIN
   IF ( ncrw_inq_dimtranspose(var_list(1),dim2,dim3) ) THEN
      WRITE(*,*) 'WARNING (ANOVA_MAIN): ', 'Exchanging ', &
           TRIM(dim2),' and ',TRIM(dim3), ' to avoid tranposition for 3D decomp'
-     xdim_loc=dim4; ydim_loc=dim3; zdim_loc=dim2; tdim_loc=dim1
+     xdim_loc=dim1; ydim_loc=dim3; zdim_loc=dim2; tdim_loc=dim4
   ELSE
-     xdim_loc=dim4; ydim_loc=dim2; zdim_loc=dim3; tdim_loc=dim1
+     xdim_loc=dim1; ydim_loc=dim2; zdim_loc=dim3; tdim_loc=dim4
   ENDIF 
   WRITE(*,*) 'INITIALIZING 3D ANOVA' 
   CALL ANOVA_INIT(xdim_loc,ydim_loc,zdim_loc,tdim_loc,anova3,3)  
@@ -70,8 +70,8 @@ PROGRAM ANOVA_MAIN
   !
   DO ivar=1,nvar
      vname = var_list(ivar) 
-     DO fixed_pos=1,fixed_len
-        WRITE(*,*) 'VAR:',TRIM(ADJUSTL(vname)),' POS:',fixed_pos
+     DO fixed_pos=anova3%it_srt,anova3%it_end ! fixed_len
+        WRITE(*,*) 'Calling ANOVA_DECOMP3D for VAR:',TRIM(ADJUSTL(vname)),' POS:',fixed_pos
         CALL ANOVA_DECOMP3D(vname,fixed_pos,anova3) 
         si_prof(:,fixed_pos) = anova3%si(:)
      ENDDO
@@ -88,7 +88,7 @@ PROGRAM ANOVA_MAIN
      xdim_loc=dim1; ydim_loc=dim2; zdim_loc=dim3; tdim_loc=dim4
   ENDIF
 
-  CALL ANOVA_INIT(xdim_loc,ydim_loc,zdim_loc,tdim_loc,anova4,4)
+  CALL ANOVA_INIT(xdim_loc,ydim_loc,zdim_loc,tdim_loc,anova4,4,1,20)
   DO ivar=1,nvar 
      vname=var_list(ivar) 
      CALL ANOVA_DECOMP4D(vname,si_residual,anova4)

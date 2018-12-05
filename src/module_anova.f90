@@ -7,7 +7,8 @@ MODULE ANOVA
   PRIVATE :: ANOVA_GETDIMSTR
 
   TYPE T_ANOVA 
-     INTEGER :: nx,ny,nz,nt,ndim  
+     INTEGER :: nx,ny,nz,nt,ndim
+     INTEGER :: nt_sub,it_srt,it_end
      CHARACTER(LEN=20)                               :: xdim,ydim,zdim,tdim,vname
      CHARACTER(LEN=20)                               :: fname 
      REAL(KIND=8)                                    :: f_empty,si_residual
@@ -102,15 +103,16 @@ MODULE ANOVA
     LOGICAL, DIMENSION(*) :: wrt 
     CHARACTER(LEN=20) :: xdim,ydim,zdim,tdim  
     INTEGER, PARAMETER :: funit=28  
-    INTEGER :: nd
+    INTEGER :: nd,t0,t1
     CHARACTER(LEN=*) :: fbase
     CHARACTER(LEN=200) :: fname 
 
     xdim=a%xdim(:3); ydim=a%ydim(:3); zdim=a%zdim(:3); tdim=a%tdim(:3) 
     nd=a%ndim
+    t0=a%it_srt
+    t1=a%it_end
     IF ( wrt(DX) .EQV. .TRUE. ) THEN   
        fname=TRIM(fbase)//TRIM(xdim)
-       WRITE(*,*) fbase,xdim,fname
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
        WRITE(funit) a%f_x(:) 
        CLOSE(funit)
@@ -130,7 +132,7 @@ MODULE ANOVA
     IF ( wrt(DT) .EQV. .TRUE. .AND. nd .GT. 3) THEN   
        fname=TRIM(fbase)//TRIM(tdim)
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_t(:) 
+       WRITE(funit) a%f_t(t0:t1) 
        CLOSE(funit) 
     ENDIF
     !
@@ -149,7 +151,7 @@ MODULE ANOVA
     IF ( wrt(DYT) .EQV. .TRUE. .AND. nd .GT. 3) THEN 
        fname=TRIM(fbase)//TRIM(ydim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_yt(:,:) 
+       WRITE(funit) a%f_yt(:,t0:t1) 
     ENDIF
     IF ( wrt(DXZ) .EQV. .TRUE. ) THEN 
        fname=TRIM(fbase)//TRIM(xdim)//'_'//TRIM(zdim) 
@@ -159,12 +161,12 @@ MODULE ANOVA
     IF ( wrt(DXT) .EQV. .TRUE. .AND.nd.GT. 3) THEN 
        fname=TRIM(fbase)//TRIM(xdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_xt(:,:) 
+       WRITE(funit) a%f_xt(:,t0:t1) 
     ENDIF
     IF ( wrt(DZT) .EQV. .TRUE. .AND.nd.GT.3) THEN 
        fname=TRIM(fbase)//TRIM(zdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_zt(:,:) 
+       WRITE(funit) a%f_zt(:,t0:t1) 
     ENDIF
     !
     ! 3-DIMENSIONAL FIELDS 
@@ -177,17 +179,17 @@ MODULE ANOVA
     IF ( wrt(DYXT) .EQV. .TRUE. .AND. nd.GT.3) THEN 
        fname=TRIM(fbase)//TRIM(ydim)//'_'//TRIM(xdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_yxt(:,:,:) 
+       WRITE(funit) a%f_yxt(:,:,t0:t1) 
     ENDIF
     IF ( wrt(DYZT) .EQV. .TRUE. .AND. nd.GT.3) THEN 
        fname=TRIM(fbase)//TRIM(ydim)//'_'//TRIM(zdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_yzt(:,:,:) 
+       WRITE(funit) a%f_yzt(:,:,t0:t1) 
     ENDIF
     IF ( wrt(DXZT) .EQV. .TRUE. .AND. nd.GT.3) THEN 
        fname=TRIM(fbase)//TRIM(xdim)//'_'//TRIM(zdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_xzt(:,:,:) 
+       WRITE(funit) a%f_xzt(:,:,t0:t0) 
     ENDIF
     
     
@@ -261,7 +263,7 @@ MODULE ANOVA
 
     WRITE(funit,108) a%si_tag((/1,3,7,8,10,13,14,15/))
 
-    DO i=1,a%nt
+    DO i=a%it_srt,a%it_end
        WRITE(funit,107) i,p( (/1,3,7,8,10,13,14,15 /), i)
     ENDDO
   ! 
@@ -324,7 +326,7 @@ MODULE ANOVA
     REAL :: chk_yx_vs_yz, chk_yx_vs_xz, chk_yz_vs_xz 
     REAL :: max_err 
 
-    CALL TIMER_START()
+    IF ( ncrw_verbose ) CALL TIMER_START()
 
     xdim=a%xdim
     ydim=a%ydim
@@ -350,17 +352,15 @@ MODULE ANOVA
     ALLOCATE(avg_yx(nz),avg_yz(nx),avg_xz(ny)) 
     ALLOCATE(avg_x(ny,nz), avg_y(nx,nz), avg_z(ny,nx),data(ny,nz),wrk(ny,nz)) 
     
-    CALL TIMER_FINISH('ANOVA_DECOMP3D: init time elapse')
-    
+    IF ( ncrw_verbose ) THEN 
+       CALL TIMER_FINISH('ANOVA_DECOMP3D: init time elapse')
+       CALL TIMER_START() 
+       WRITE(*,*) 'ANOVA_DECOMP3D: STEP 1 - INTEGRATION' 
+    ENDIF 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! STEP 1: INTEGRATION 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    CALL TIMER_START() 
-
-    IF ( ncrw_verbose ) & 
-         WRITE(*,*) 'ANOVA_DECOMP3D: STEP 1 - INTEGRATION' 
- 
     avg_yxz=0. 
     avg_yx(:)=0.; avg_yz(:)=0.; avg_xz(:)=0.
     avg_x(:,:)=0.;avg_y(:,:)=0.;avg_z(:,:)=0.
@@ -400,16 +400,18 @@ MODULE ANOVA
        WRITE(*,*) 'x: ',SUM(avg_x/nyz) - avg_yxz
        WRITE(*,*) 'y: ',SUM(avg_y/nxz) - avg_yxz
        WRITE(*,*) 'z: ',SUM(avg_z/nyx) - avg_yxz
-       STOP 'CONSERVATION PROBLEM IN DECOMPOSITION'   
-    ELSE IF ( ncrw_verbose ) THEN  
+       STOP 'CONSERVATION PROBLEM IN DECOMPOSITION'    
+    ENDIF
+    
+    IF ( ncrw_verbose ) THEN  
        WRITE(*,*) 'ANOVA_DECOMP3D: STEP 1 Finished, Integral Calculus consistent'  
        CALL TIMER_FINISH('ANOVA_DECOMP3D: STEP 1 Time elapse') 
+       CALL TIMER_START() 
     ENDIF
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! STEP 2: DECOMPOSITION 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!   
-    CALL TIMER_START() 
     IF ( ncrw_verbose ) WRITE(*,*) 'ANOVA_DECOMP3D: STEP 2 - DECOMPOSITION AND SENSITIVITY INDICES' 
     a%f_empty=avg_yxz 
     ! 
@@ -542,28 +544,45 @@ MODULE ANOVA
 
     CALL GET_SORT_INDICES(DLAST,a%si,a%si_order)
 
-    CALL TIMER_FINISH('ANOVA_DECOMP3D: STEP2 Time elapse') 
+    IF ( ncrw_verbose ) & 
+         CALL TIMER_FINISH('ANOVA_DECOMP3D: STEP2 Time elapse') 
 
   END SUBROUTINE ANOVA_DECOMP3D   
 
 
-  SUBROUTINE ANOVA_INIT(xdim,ydim,zdim,tdim,a,ndim)   
+  SUBROUTINE ANOVA_INIT(xdim,ydim,zdim,tdim,a,ndim,it_srt,it_end)   
     IMPLICIT NONE
 
     CHARACTER(LEN=*), INTENT(IN) :: xdim,ydim,zdim,tdim   
     INTEGER,          INTENT(IN) :: ndim
+    INTEGER,          INTENT(IN), OPTIONAL :: it_srt, it_end
     INTEGER :: nx,ny,nz,nt 
     TYPE(T_ANOVA) :: a 
 
+    WRITE(*,*) 'INITIALIZING', ndim,'-dim ANOVA'
     a%ndim=ndim 
     a%nx=ncrw_getdimlen(xdim);  a%xdim=xdim; nx=a%nx
     a%ny=ncrw_getdimlen(ydim);  a%ydim=ydim; ny=a%ny 
     a%nz=ncrw_getdimlen(zdim);  a%zdim=zdim; nz=a%nz 
-    a%nt=ncrw_getdimlen(tdim);  a%tdim=tdim; nt=a%nt
-    
+    a%nt=ncrw_getdimlen(tdim);  a%tdim=tdim; nt=a%nt  
+    !
+    ! Parse inpupt for subset in last index 
+    a%it_srt = 1 
+    a%it_end = nt 
+    IF ( PRESENT(it_srt) ) a%it_srt=it_srt 
+    IF ( PRESENT(it_end) ) a%it_end=it_end 
+    a%nt_sub = (a%it_end - a%it_srt) + 1 
+    IF ( a%nt_sub .GT. nt .OR. a%it_end .GT. nt ) THEN 
+       WRITE(*,*) 'ERROR (ANOVA_DECOMP4D): index bounds given for exceed range of data'
+       WRITE(*,*) '                        it_srt',a%it_srt,' a%it_end',a%it_end, 'a%nt_sub', a%nt_sub     
+       STOP 'ERROR' 
+    ENDIF
+    !
+    WRITE(*,*) 'ANOVA_DECOMP4D: processing t from', a%it_srt, ' to ', a%it_end, '(', a%nt_sub, ')'
+    !
     CALL ANOVA_SETDIMSTR(a) 
     ALLOCATE(a%si_order(DLAST)) 
- 
+    ! 
     IF ( ndim .GE. 3 ) THEN 
        ALLOCATE(a%f_x(nx), a%f_y(ny), a%f_z(nz)) 
        ALLOCATE(a%f_xz(nx,nz), a%f_yz(ny,nz), a%f_yx(ny,nx))
@@ -591,8 +610,8 @@ MODULE ANOVA
 
     IMPLICIT NONE
 
-    CHARACTER(LEN=*), INTENT(IN) :: vname
-    REAL(KIND=8)                                :: si_res   
+    CHARACTER(LEN=*), INTENT(IN)           :: vname
+    REAL(KIND=8)  :: si_res   
     TYPE(T_ANOVA) :: a
     ! 
     REAL(KIND=8)                                :: avg_yxzt,rdum,f_empty
@@ -608,12 +627,13 @@ MODULE ANOVA
 
     CHARACTER(LEN=NCRW_MAXDIMLEN) :: xdim,ydim,zdim,tdim
 
-    INTEGER :: ix,iy,iz,it 
+    INTEGER :: ix,iy,iz,it   
     INTEGER :: nx,ny,nz,nt
     INTEGER :: nyz,nyx,nyt,nxz,nxt,nzt
     INTEGER :: nyzt,nxzt,nyxt,nyxz 
     INTEGER :: nyxzt 
-
+    INTEGER :: it_srt,it_end,nt_sub
+    
     CALL TIMER_START()
 
     xdim=a%xdim
@@ -625,15 +645,21 @@ MODULE ANOVA
     ny=a%ny!ncrw_getdimlen(ydim);
     nz=a%nz!ncrw_getdimlen(zdim); 
     nt=a%nt!ncrw_getdimlen(tdim); 
-
+    ! 
+    it_srt=a%it_srt 
+    it_end=a%it_end 
+    nt_sub=a%nt_sub
     
     IF ( ncrw_verbose ) THEN 
        WRITE(*,*) '=============='
-       WRITE(*,*) 'ANOVA_DECOMP4D: VARIABLE ',TRIM(vname),' NX=',nx,' NY=',ny,' NZ=',nz, ' NT=',nt 
+       WRITE(*,*) 'ANOVA_DECOMP4D: VARIABLE ',TRIM(vname),' NX=',nx,' NY=',ny,' NZ=',nz, ' NT=',nt  
+       WRITE(*,*) '                PROCESSING RANGE IN LAST INDEX:', it_srt,it_end,nt_sub
     ENDIF
-    nyz=ny*nz;     nyx=ny*nx;     nyt=ny*nt;     nxz=nx*nz;     nxt=nx*nt; nzt=nz*nt  
-    nyzt=ny*nz*nt; nxzt=nx*nz*nt; nyxt=ny*nx*nt; nyxz=ny*nx*nz
-    nyxzt=ny*nx*nz*nt
+
+    !
+    nyz=ny*nz;     nyx=ny*nx;     nyt=ny*nt_sub;     nxz=nx*nz;     nxt=nx*nt_sub; nzt=nz*nt_sub
+    nyzt=ny*nz*nt_sub; nxzt=nx*nz*nt_sub; nyxt=ny*nx*nt_sub; nyxz=ny*nx*nz
+    nyxzt=ny*nx*nz*nt_sub
 
     yz_dims(1) = ydim;  yz_dims(2) = zdim
     xt_dims(1) = xdim;  xt_dims(2) = tdim
@@ -643,7 +669,8 @@ MODULE ANOVA
     ALLOCATE(avg_x(ny,nz,nt), avg_y(nx,nz,nt), avg_z(ny,nx,nt),avg_t(ny,nx,nz)) 
     ALLOCATE(data(ny,nz),f_yxzt(ny,nz)) 
 
-    CALL TIMER_FINISH('ANOVA_DECOMP4D: INIT time elapse') 
+    IF ( ncrw_verbose ) & 
+         CALL TIMER_FINISH('ANOVA_DECOMP4D: INIT time elapse') 
 
     CALL TIMER_START() 
     IF ( ncrw_verbose ) THEN
@@ -657,7 +684,8 @@ MODULE ANOVA
     a%f_empty=0.; a%f_x(:)=0.; a%f_y(:)=0.; a%f_z(:)=0.; a%f_t(:)=0.; 
     a%f_yx(:,:)=0.; a%f_yz(:,:)=0.; a%f_yt(:,:)=0.; a%f_xz(:,:)=0.; a%f_xt(:,:)=0.; a%f_zt(:,:)=0. 
     a%f_yxz(:,:,:)=0.; a%f_yzt(:,:,:)=0.; a%f_xzt(:,:,:)=0.; a%f_yxt(:,:,:)=0. 
-    DO it=1,nt;  DO ix=1,nx 
+    ! 
+    DO it=it_srt,it_end;  DO ix=1,nx 
        pos(1)=ix  
        pos(2)=it 
        CALL ncrw_getvar_slice(vname,yz_dims,xt_dims,pos,data)    
@@ -668,7 +696,7 @@ MODULE ANOVA
        avg_yxzt=avg_yxzt+rdum/nyxzt
        
        avg_x(:,:,it) = avg_x(:,:,it)+data/nx  
-       avg_t(:,ix,:) = avg_t(:,ix,:)+data/nt
+       avg_t(:,ix,:) = avg_t(:,ix,:)+data/nt_sub
        
        DO iy=1,ny  
           rdum=SUM(data(iy,:)) 
@@ -695,7 +723,7 @@ MODULE ANOVA
     IF ( SUM(avg_yxt/nz) - avg_yxzt .GT. SMALL_DELTA .OR. &
          SUM(avg_yzt/nx) - avg_yxzt .GT. SMALL_DELTA .OR. &
          SUM(avg_xzt/ny) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_yxz/nt) - avg_yxzt .GT. SMALL_DELTA .OR. &
+         SUM(avg_yxz/nt_sub) - avg_yxzt .GT. SMALL_DELTA .OR. &
          SUM(avg_yx/nzt) - avg_yxzt .GT. SMALL_DELTA .OR. &
          SUM(avg_yz/nxt) - avg_yxzt .GT. SMALL_DELTA .OR. &
          SUM(avg_y/nxzt) - avg_yxzt .GT. SMALL_DELTA .OR. &
@@ -711,7 +739,9 @@ MODULE ANOVA
        IF ( ncrw_verbose ) & 
             WRITE(*,*) 'ANOVA_DECOMP4D: STEP 1 FINISHED, INTEGRAL CALCULUS CONSISTENT' 
     ENDIF
-    CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP 1 time elapse') 
+    
+    IF ( ncrw_verbose ) & 
+         CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP 1 time elapse') 
     CALL TIMER_START() 
 
 
@@ -727,31 +757,31 @@ MODULE ANOVA
     DO iy=1,ny
        DO ix=1,nx; a%f_yx(iy,ix)=avg_zt(iy,ix)-a%f_y(iy)-a%f_x(ix)-a%f_empty; ENDDO 
        DO iz=1,nz; a%f_yz(iy,iz)=avg_xt(iy,iz)-a%f_y(iy)-a%f_z(iz)-a%f_empty; ENDDO 
-       DO it=1,nt; a%f_yt(iy,it)=avg_xz(iy,it)-a%f_y(iy)-a%f_t(it)-a%f_empty; ENDDO 
+       DO it=it_srt,it_end; a%f_yt(iy,it)=avg_xz(iy,it)-a%f_y(iy)-a%f_t(it)-a%f_empty; ENDDO 
     ENDDO 
     DO ix=1,nx
        DO iz=1,nz; a%f_xz(ix,iz)=avg_yt(ix,iz)-a%f_x(ix)-a%f_z(iz)-a%f_empty; ENDDO 
-       DO it=1,nt; a%f_xt(ix,it)=avg_yz(ix,it)-a%f_x(ix)-a%f_t(it)-a%f_empty; ENDDO 
+       DO it=it_srt,it_end; a%f_xt(ix,it)=avg_yz(ix,it)-a%f_x(ix)-a%f_t(it)-a%f_empty; ENDDO 
     ENDDO 
 
     DO iz=1,nz
-       DO it=1,nt; a%f_zt(iz,it)=avg_yx(iz,it)-a%f_z(iz)-a%f_t(it)-a%f_empty; ENDDO 
+       DO it=it_srt,it_end; a%f_zt(iz,it)=avg_yx(iz,it)-a%f_z(iz)-a%f_t(it)-a%f_empty; ENDDO 
     ENDDO
 
     DO iy=1,ny
        DO ix=1,nx; DO iz=1,nz
           a%f_yxz(iy,ix,iz)=avg_t(iy,ix,iz)-a%f_y(iy)-a%f_x(ix)-a%f_z(iz)-a%f_yx(iy,ix)-a%f_yz(iy,iz)-a%f_xz(ix,iz)-a%f_empty
        ENDDO; ENDDO 
-       DO ix=1,nx; DO it=1,nt
+       DO ix=1,nx; DO it=it_srt,it_end
           a%f_yxt(iy,ix,it)=avg_z(iy,ix,it)-a%f_y(iy)-a%f_x(ix)-a%f_t(it)-a%f_yx(iy,ix)-a%f_yt(iy,it)-a%f_xt(ix,it)-a%f_empty
        ENDDO; ENDDO 
-       DO iz=1,nz; DO it=1,nt
+       DO iz=1,nz; DO it=it_srt,it_end
           a%f_yzt(iy,iz,it)=avg_x(iy,iz,it)-a%f_y(iy)-a%f_z(iz)-a%f_t(it)-a%f_yz(iy,iz)-a%f_yt(iy,it)-a%f_zt(iz,it)-a%f_empty  
        ENDDO;ENDDO
     ENDDO
 
     DO ix=1,nx     
-       DO iz=1,nz; DO it=1,nt
+       DO iz=1,nz; DO it=it_srt,it_end
           a%f_xzt(ix,iz,it)=avg_y(ix,iz,it)-a%f_x(ix)-a%f_z(iz)-a%f_t(it)-a%f_xz(ix,iz)-a%f_xt(ix,it)-a%f_zt(iz,it)-a%f_empty  
        ENDDO;ENDDO 
     ENDDO
@@ -759,7 +789,7 @@ MODULE ANOVA
     ! STEP 3 Total variance and residual 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
     a%si(:DLAST) = 0. 
-    DO it=1,nt; DO ix=1,nx  
+    DO it=it_srt,it_end; DO ix=1,nx  
        pos(1)=ix 
        pos(2)=it 
        CALL ncrw_getvar_slice(vname,yz_dims,xt_dims,pos,data)   
@@ -782,7 +812,7 @@ MODULE ANOVA
     a%si(DX)=SUM(a%f_x*a%f_x)/nx
     a%si(DY)=SUM(a%f_y*a%f_y)/ny
     a%si(DZ)=SUM(a%f_z*a%f_z)/nz
-    a%si(DT)=SUM(a%f_t*a%f_t)/nt
+    a%si(DT)=SUM(a%f_t*a%f_t)/nt_sub
     a%si(DYX)=SUM(a%f_yx*a%f_yx)/nyx
     a%si(DYZ)=SUM(a%f_yz*a%f_yz)/nyz
     a%si(DYT)=SUM(a%f_yt*a%f_yt)/nyt
@@ -807,7 +837,8 @@ MODULE ANOVA
 
     CALL GET_SORT_INDICES(DLAST,a%si,a%si_order)
 
-    CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP 2 Time elapse') 
+    IF ( ncrw_verbose ) & 
+         CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP 2 Time elapse') 
 
     RETURN 
 
