@@ -363,33 +363,36 @@ MODULE ANOVA
     zdim=a%zdim
     fixed_dim=a%tdim
 
-    nx=a%nx_sub
+    nx=a%nx
     ny=a%ny
     nz=a%nz
-    nt=a%nt_sub
-
-    x0=a%ix_srt 
-    x1=a%ix_end 
+    nt=a%nt
 
     IF ( ncrw_verbose ) THEN 
        WRITE(*,*) '============'
        WRITE(*,*) 'ANOVA_DECOMP3D: VARIABLE ',TRIM(vname),' NX=',nx,' NY=',ny,' NZ=',nz, ' FIXED_POS=',fixed_pos 
     ENDIF
-    nyz=ny*nz 
-    nxz=nx*nz 
-    nyx=ny*nx
-    nyxz=ny*nx*nz
     yz_dims(1) = ydim;  yz_dims(2) = zdim
     xt_dims(1) = xdim;  xt_dims(2) = fixed_dim
 
     ALLOCATE(avg_yx(nz),avg_yz(nx),avg_xz(ny)) 
     ALLOCATE(avg_x(ny,nz), avg_y(nx,nz), avg_z(ny,nx),data(ny,nz),wrk(ny,nz)) 
-    
+
+    nx=a%nx_sub
+    x0=a%ix_srt 
+    x1=a%ix_end  
+
+    nyz=ny*nz 
+    nxz=nx*nz 
+    nyx=ny*nx
+    nyxz=ny*nx*nz
+
     IF ( ncrw_verbose ) THEN 
        CALL TIMER_FINISH('ANOVA_DECOMP3D: init time elapse')
        CALL TIMER_START() 
        WRITE(*,*) 'ANOVA_DECOMP3D: STEP 1 - INTEGRATION' 
     ENDIF 
+
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! STEP 1: INTEGRATION 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -398,6 +401,7 @@ MODULE ANOVA
     avg_yx(:)=0.; avg_yz(:)=0.; avg_xz(:)=0.
     avg_x(:,:)=0.;avg_y(:,:)=0.;avg_z(:,:)=0.
     pos(2) = fixed_pos
+    ! 
     DO ix=x0,x1
        pos(1)=ix  
        CALL ncrw_getvar_slice(vname,yz_dims,xt_dims,pos,data)    
@@ -454,10 +458,11 @@ MODULE ANOVA
     ! 
     DO iy=1,ny 
        DO ix=x0,x1; a%f_yx(iy,ix)=avg_z(iy,ix)-a%f_x(ix)-a%f_y(iy)-a%f_empty;ENDDO 
-       DO iz=1,nz; a%f_yz(iy,iz)=avg_x(iy,iz)-a%f_z(iz)-a%f_y(iy)-a%f_empty;ENDDO
+       DO iz=1,nz;  a%f_yz(iy,iz)=avg_x(iy,iz)-a%f_z(iz)-a%f_y(iy)-a%f_empty;ENDDO
     ENDDO
+    !
     DO ix=x0,x1
-       DO iz=1,nz; a%f_xz(ix,iz)=avg_y(ix,iz)-a%f_z(iz)-a%f_x(ix)-a%f_empty;ENDDO  
+       DO iz=1,nz;  a%f_xz(ix,iz)=avg_y(ix,iz)-a%f_z(iz)-a%f_x(ix)-a%f_empty;ENDDO  
     ENDDO 
 
     a%si(:DLAST) = 0. 
@@ -473,12 +478,12 @@ MODULE ANOVA
        a%si(DYXZ) = a%si(DYXZ) + ( SUM(a%f_yxz(:,ix,:)*a%f_yxz(:,ix,:)) ) / nyxz
     ENDDO
 
-    a%si(DX)  = SUM(a%f_x*a%f_x)/nx 
+    a%si(DX)  = SUM(a%f_x(x0:x1)*a%f_x(x0:x1))/nx 
     a%si(DY)  = SUM(a%f_y*a%f_y)/ny
     a%si(DZ)  = SUM(a%f_z*a%f_z)/nz
-    a%si(DYX) = SUM(a%f_yx*a%f_yx)/nyx
+    a%si(DYX) = SUM(a%f_yx(:,x0:x1)*a%f_yx(:,x0:x1))/nyx
     a%si(DYZ) = SUM(a%f_yz*a%f_yz)/nyz 
-    a%si(DXZ) = SUM(a%f_xz*a%f_xz)/nxz  
+    a%si(DXZ) = SUM(a%f_xz(x0:x1,:)*a%f_xz(x0:x1,:))/nxz  
     a%si_residual = a%si(DTOT) - a%si(DYXZ)-a%si(DYX)-a%si(DYZ)-a%si(DXZ)-a%si(DX)-a%si(DY)-a%si(DZ) 
 
     IF ( ABS ( a%si_residual/a%si(DTOT)  ) .GT. 1e-6 ) THEN 
