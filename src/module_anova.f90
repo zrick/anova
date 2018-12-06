@@ -481,7 +481,7 @@ MODULE ANOVA
     ! xy 
     chk_x_vs_y=0.; chk_x_vs_z=0.; chk_x_vs_yx=0.; chk_x_vs_xz=0.; chk_x_vs_yz=0.
     chk_y_vs_z=0.;                chk_y_vs_yx=0.; chk_y_vs_xz=0.; chk_y_vs_yz=0.
-    ;                             chk_z_vs_yx=0.; chk_z_vs_xz=0.; chk_z_vs_yz=0.
+                                  chk_z_vs_yx=0.; chk_z_vs_xz=0.; chk_z_vs_yz=0.
     chk_yx_vs_yz=0.; chk_yx_vs_xz=0.; chk_yz_vs_xz=0.; 
     DO ix=1,nx 
        DO iy=1,ny; 
