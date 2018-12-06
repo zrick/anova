@@ -104,7 +104,7 @@ MODULE ANOVA
     LOGICAL, DIMENSION(*) :: wrt 
     CHARACTER(LEN=20) :: xdim,ydim,zdim,tdim  
     INTEGER, PARAMETER :: funit=28  
-    INTEGER :: nd,t0,t1
+    INTEGER :: nd,t0,t1,x0,x1
     CHARACTER(LEN=*) :: fbase
     CHARACTER(LEN=200) :: fname, fbase_loc
 
@@ -112,6 +112,8 @@ MODULE ANOVA
     nd=a%ndim
     t0=a%it_srt
     t1=a%it_end
+    x0=a%ix_srt 
+    x1=a%ix_end
     
     WRITE(*,*) 'OUTPUT_BIN:', a%it_srt,a%it_end,a%nt_sub,a%nt,a%trange 
 
@@ -129,7 +131,7 @@ MODULE ANOVA
     IF ( wrt(DX) .EQV. .TRUE. ) THEN   
        fname=TRIM(fbase_loc)//TRIM(xdim)
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_x(:) 
+       WRITE(funit) a%f_x(x0:x1) 
        CLOSE(funit)
     ENDIF
     IF ( wrt(DY) .EQV. .TRUE. ) THEN   
@@ -156,7 +158,7 @@ MODULE ANOVA
     IF ( wrt(DYX) .EQV. .TRUE. ) THEN 
        fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(xdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_yx(:,:) 
+       WRITE(funit) a%f_yx(:,x0:x1) 
     ENDIF
     IF ( wrt(DYZ) .EQV. .TRUE. ) THEN 
        fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(zdim) 
@@ -171,12 +173,12 @@ MODULE ANOVA
     IF ( wrt(DXZ) .EQV. .TRUE. ) THEN 
        fname=TRIM(fbase_loc)//TRIM(xdim)//'_'//TRIM(zdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_xz(:,:) 
+       WRITE(funit) a%f_xz(x0:x1,:) 
     ENDIF
     IF ( wrt(DXT) .EQV. .TRUE. .AND.nd.GT. 3) THEN 
        fname=TRIM(fbase_loc)//TRIM(xdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_xt(:,t0:t1) 
+       WRITE(funit) a%f_xt(x0:x1,t0:t1) 
     ENDIF
     IF ( wrt(DZT) .EQV. .TRUE. .AND.nd.GT.3) THEN 
        fname=TRIM(fbase_loc)//TRIM(zdim)//'_'//TRIM(tdim) 
@@ -189,12 +191,12 @@ MODULE ANOVA
     IF ( wrt(DYXZ) .EQV. .TRUE. ) THEN 
        fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(xdim)//'_'//TRIM(zdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_yxz(:,:,:) 
+       WRITE(funit) a%f_yxz(:,x0:x1,:) 
     ENDIF
     IF ( wrt(DYXT) .EQV. .TRUE. .AND. nd.GT.3) THEN 
        fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(xdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_yxt(:,:,t0:t1) 
+       WRITE(funit) a%f_yxt(:,x0:x1,t0:t1) 
     ENDIF
     IF ( wrt(DYZT) .EQV. .TRUE. .AND. nd.GT.3) THEN 
        fname=TRIM(fbase_loc)//TRIM(ydim)//'_'//TRIM(zdim)//'_'//TRIM(tdim) 
@@ -204,7 +206,7 @@ MODULE ANOVA
     IF ( wrt(DXZT) .EQV. .TRUE. .AND. nd.GT.3) THEN 
        fname=TRIM(fbase_loc)//TRIM(xdim)//'_'//TRIM(zdim)//'_'//TRIM(tdim) 
        OPEN(funit,FILE=fname,ACCESS='STREAM',FORM='UNFORMATTED')  
-       WRITE(funit) a%f_xzt(:,:,t0:t0) 
+       WRITE(funit) a%f_xzt(x0:x1,:,t0:t0) 
     ENDIF
     
     
@@ -727,10 +729,6 @@ MODULE ANOVA
     ENDIF
 
     !
-    nyz=ny*nz;     nyx=ny*nx;     nyt=ny*nt;     nxz=nx*nz;     nxt=nx*nt; nzt=nz*nt
-    nyzt=ny*nz*nt; nxzt=nx*nz*nt; nyxt=ny*nx*nt; nyxz=ny*nx*nz
-    nyxzt=ny*nx*nz*nt
-
     yz_dims(1) = ydim;  yz_dims(2) = zdim
     xt_dims(1) = xdim;  xt_dims(2) = tdim
     !
@@ -738,6 +736,15 @@ MODULE ANOVA
     ALLOCATE(avg_yx(nz,nt),avg_yz(nx,nt),avg_yt(nx,nz),avg_xz(ny,nt),avg_xt(ny,nz),avg_zt(ny,nx))  
     ALLOCATE(avg_x(ny,nz,nt), avg_y(nx,nz,nt), avg_z(ny,nx,nt),avg_t(ny,nx,nz)) 
     ALLOCATE(data(ny,nz),f_yxzt(ny,nz)) 
+
+    nt=a%nt_sub   ! This hack allocates the full arrays, 
+    nx=a%nx_sub   ! }but normalizes only by the sub-sampled data
+
+    nyz=ny*nz;     nyx=ny*nx;     nyt=ny*nt;     nxz=nx*nz;     nxt=nx*nt; nzt=nz*nt
+    nyzt=ny*nz*nt; nxzt=nx*nz*nt; nyxt=ny*nx*nt; nyxz=ny*nx*nz
+    nyxzt=ny*nx*nz*nt
+
+
 
     IF ( ncrw_verbose ) & 
          CALL TIMER_FINISH('ANOVA_DECOMP4D: INIT time elapse') 
