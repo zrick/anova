@@ -1,0 +1,21 @@
+&ANOVA_GLOBAL
+nc_filename_input='LES-ALM-SP1.12h-16h.nc'
+dim1='t' 
+dim2='x'
+dim3='y' 
+dim4='z' 
+nvar=2
+decomp_3d=.TRUE. 
+decomp_4d=.TRUE.
+/
+
+&ANOVA_VARS 
+var_list= 'T' 'QVAPOR' 
+/
+
+&ANOVA_RANGES  
+range1_4d=5,60
+range4_4d=10,20 
+range1_3d=0,0
+range4_3d=1,10
+/
