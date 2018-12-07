@@ -15,7 +15,7 @@ PROGRAM ANOVA_MAIN
   CHARACTER :: vname*128,outbase*256
   CHARACTER(LEN=20) :: dim1,    dim2,    dim3,    dim4,    dummy, trange
   CHARACTER(LEN=20) :: xdim_loc,ydim_loc,zdim_loc,tdim_loc 
-  CHARACTER(LEN=64), DIMENSION(:), ALLOCATABLE :: var_list 
+  CHARACTER(LEN=64), DIMENSION(NCRW_MAXVAR) :: var_list 
   REAL(KIND=8), DIMENSION(:), ALLOCATABLE :: d_arr  
   REAL(KIND=8) :: si_residual
   REAL(KIND=8), DIMENSION(:,:),ALLOCATABLE :: si_prof 
@@ -36,7 +36,6 @@ PROGRAM ANOVA_MAIN
 
   OPEN(10,file='anova.nml') 
   READ(10,nml=anova_global)  
-  ALLOCATE(var_list(nvar)) 
   READ(10,nml=anova_vars)  
   READ(10,nml=anova_ranges)
 
