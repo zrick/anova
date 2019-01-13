@@ -659,15 +659,18 @@ MODULE ANOVA
     CALL ANOVA_SETDIMSTR(a) 
     ALLOCATE(a%si_order(DLAST)) 
     ! 
-    IF ( ndim .GE. 3 ) THEN 
-       ALLOCATE(a%f_x(nx), a%f_y(ny), a%f_z(nz)) 
-       ALLOCATE(a%f_xz(nx,nz), a%f_yz(ny,nz), a%f_yx(ny,nx))
-       ALLOCATE(a%f_yxz(ny,nx,nz))
+    IF ( ndim .LT. 3 ) THEN  
+       STOP 'ANOVA_INIT: LESS THAN 3D ANOVA NOT IMPLEMENTED' 
+    ELSEIF( ndim .GE. 3 ) THEN 
+       ALLOCATE(a%f_x(a%ix_srt:a%ix_end), a%f_y(ny), a%f_z(nz)) 
+       ALLOCATE(a%f_xz(a%ix_srt:a%ix_end,nz), a%f_yz(ny,nz), a%f_yx(ny,a%ix_srt:a%ix_end))
+       ALLOCATE(a%f_yxz(ny,a%ix_srt:a%ix_end,nz))
        ALLOCATE(a%si(DLAST))
        IF ( ndim .EQ. 4 ) THEN 
-          ALLOCATE(a%f_t(nt)) 
-          ALLOCATE(a%f_zt(nz,nt), a%f_xt(nx,nt), a%f_yt(ny,nt))
-          ALLOCATE(a%f_yzt(ny,nz,nt), a%f_xzt(nx,nz,nt), a%f_yxt(ny,nx,nt))
+          ALLOCATE(a%f_t(a%it_srt:a%it_end)) 
+          ALLOCATE(a%f_zt(nz,a%it_srt:a%it_end), a%f_xt(a%ix_srt:a%ix_end,a%it_srt:a%it_end), a%f_yt(ny,a%it_srt:a%it_end))
+          ALLOCATE(a%f_yzt(ny,nz,a%it_srt:a%it_end), a%f_xzt(a%ix_srt:a%ix_end,nz,a%it_srt:a%it_end), & 
+               a%f_yxt(ny,a%ix_srt:a%ix_end,a%it_srt:a%it_end))
        ELSE IF ( ndim .GT. 4 ) THEN 
           STOP 'ANOVA_INIT: MORE THAN 4D ANOVA NOT IMPLEMENTED'
        ENDIF
@@ -729,27 +732,24 @@ MODULE ANOVA
     IF ( ncrw_verbose ) THEN 
        WRITE(*,*) '=============='
        WRITE(*,*) 'ANOVA_DECOMP4D: VARIABLE ',TRIM(vname),' NX=',a%nx,' NY=',a%ny,' NZ=',a%nz, ' NT=',a%nt  
-       WRITE(*,*) '                PROCESSING RANGE IN LAST INDEX:', t0,t1,nt
        WRITE(*,*) '                PROCESSING RANGE IN FIRST INDEX:',x0,x1,nx
+       WRITE(*,*) '                PROCESSING RANGE IN LAST INDEX:', t0,t1,nt
     ENDIF
 
+    nt=a%nt_sub   ! This hack allocates the full arrays, 
+    nx=a%nx_sub   ! }but normalizes only by the sub-sampled data
     !
     yz_dims(1) = ydim;  yz_dims(2) = zdim
     xt_dims(1) = xdim;  xt_dims(2) = tdim
     !
-    ALLOCATE(avg_yxz(nt),avg_yzt(nx),avg_xzt(ny),avg_yxt(nz)) 
-    ALLOCATE(avg_yx(nz,nt),avg_yz(nx,nt),avg_yt(nx,nz),avg_xz(ny,nt),avg_xt(ny,nz),avg_zt(ny,nx))  
-    ALLOCATE(avg_x(ny,nz,nt), avg_y(nx,nz,nt), avg_z(ny,nx,nt),avg_t(ny,nx,nz)) 
+    ALLOCATE(avg_yxz(t0:t1),avg_yzt(x0:x1),avg_xzt(ny),avg_yxt(nz)) 
+    ALLOCATE(avg_yx(nz,t0:t1),avg_yz(x0:x1,t0:t1),avg_yt(x0:x1,nz),avg_xz(ny,t0:t1),avg_xt(ny,nz),avg_zt(ny,x0:x1))  
+    ALLOCATE(avg_x(ny,nz,t0:t1), avg_y(x0:x1,nz,t0:t1), avg_z(ny,x0:x1,t0:t1),avg_t(ny,x0:x1,nz)) 
     ALLOCATE(data(ny,nz),f_yxzt(ny,nz)) 
-
-    nt=a%nt_sub   ! This hack allocates the full arrays, 
-    nx=a%nx_sub   ! }but normalizes only by the sub-sampled data
 
     nyz=ny*nz;     nyx=ny*nx;     nyt=ny*nt;     nxz=nx*nz;     nxt=nx*nt; nzt=nz*nt
     nyzt=ny*nz*nt; nxzt=nx*nz*nt; nyxt=ny*nx*nt; nyxz=ny*nx*nz
     nyxzt=ny*nx*nz*nt
-
-
 
     IF ( ncrw_verbose ) & 
          CALL TIMER_FINISH('ANOVA_DECOMP4D: INIT time elapse') 
@@ -767,7 +767,9 @@ MODULE ANOVA
     a%f_yx(:,:)=0.; a%f_yz(:,:)=0.; a%f_yt(:,:)=0.; a%f_xz(:,:)=0.; a%f_xt(:,:)=0.; a%f_zt(:,:)=0. 
     a%f_yxz(:,:,:)=0.; a%f_yzt(:,:,:)=0.; a%f_xzt(:,:,:)=0.; a%f_yxt(:,:,:)=0. 
     ! 
-    DO it=t0,t1;  DO ix=x0,x1 
+    DO it=t0,t1;  
+       DO ix=x0,x1  
+
        pos(1)=ix  
        pos(2)=it 
        CALL ncrw_getvar_slice(vname,yz_dims,xt_dims,pos,data)    
@@ -835,61 +837,83 @@ MODULE ANOVA
     a%f_y = avg_xzt - a%f_empty 
     a%f_z = avg_yxt - a%f_empty 
     a%f_t = avg_yxz - a%f_empty
+
+    IF ( ncrw_verbose ) WRITE(*,*) 'ANOVA_DECOMP4D: Global average ', a%f_empty 
+
+
     
     DO iy=1,ny
-       DO ix=x0,x1; a%f_yx(iy,ix)=avg_zt(iy,ix)-a%f_y(iy)-a%f_x(ix)-a%f_empty; ENDDO 
-       DO iz=1,nz;  a%f_yz(iy,iz)=avg_xt(iy,iz)-a%f_y(iy)-a%f_z(iz)-a%f_empty; ENDDO 
-       DO it=t0,t1; a%f_yt(iy,it)=avg_xz(iy,it)-a%f_y(iy)-a%f_t(it)-a%f_empty; ENDDO 
+       DO ix=x0,x1; 
+          a%f_yx(iy,ix)=avg_zt(iy,ix)-a%f_y(iy)-a%f_x(ix)-a%f_empty; 
+       ENDDO
+       DO iz=1,nz;  a%f_yz(iy,iz)=avg_xt(iy,iz)-a%f_y(iy)-a%f_z(iz)-a%f_empty; 
+       ENDDO
+       DO it=t0,t1;
+          a%f_yt(iy,it)=avg_xz(iy,it)-a%f_y(iy)-a%f_t(it)-a%f_empty; 
+       ENDDO
     ENDDO 
     DO ix=x0,x1
-       DO iz=1,nz;  a%f_xz(ix,iz)=avg_yt(ix,iz)-a%f_x(ix)-a%f_z(iz)-a%f_empty; ENDDO 
-       DO it=t0,t1; a%f_xt(ix,it)=avg_yz(ix,it)-a%f_x(ix)-a%f_t(it)-a%f_empty; ENDDO 
+       DO iz=1,nz;  
+          a%f_xz(ix,iz)=avg_yt(ix,iz)-a%f_x(ix)-a%f_z(iz)-a%f_empty; 
+       ENDDO
+       DO it=t0,t1; 
+          a%f_xt(ix,it)=avg_yz(ix,it)-a%f_x(ix)-a%f_t(it)-a%f_empty; 
+       ENDDO
     ENDDO 
 
     DO iz=1,nz
-       DO it=t0,t1; a%f_zt(iz,it)=avg_yx(iz,it)-a%f_z(iz)-a%f_t(it)-a%f_empty; ENDDO 
+       DO it=t0,t1; 
+          a%f_zt(iz,it)=avg_yx(iz,it)-a%f_z(iz)-a%f_t(it)-a%f_empty; 
+       ENDDO
     ENDDO
 
     DO iy=1,ny
-       DO ix=x0,x1; DO iz=1,nz
-          a%f_yxz(iy,ix,iz)=avg_t(iy,ix,iz)-a%f_y(iy)-a%f_x(ix)-a%f_z(iz)-a%f_yx(iy,ix)-a%f_yz(iy,iz)-a%f_xz(ix,iz)-a%f_empty
-       ENDDO; ENDDO 
-       DO ix=x0,x1; DO it=t0,t1
-          a%f_yxt(iy,ix,it)=avg_z(iy,ix,it)-a%f_y(iy)-a%f_x(ix)-a%f_t(it)-a%f_yx(iy,ix)-a%f_yt(iy,it)-a%f_xt(ix,it)-a%f_empty
-       ENDDO; ENDDO 
-       DO iz=1,nz; DO it=t0,t1
-          a%f_yzt(iy,iz,it)=avg_x(iy,iz,it)-a%f_y(iy)-a%f_z(iz)-a%f_t(it)-a%f_yz(iy,iz)-a%f_yt(iy,it)-a%f_zt(iz,it)-a%f_empty  
-       ENDDO;ENDDO
+       DO ix=x0,x1; 
+          DO iz=1,nz
+             a%f_yxz(iy,ix,iz)=avg_t(iy,ix,iz)-a%f_y(iy)-a%f_x(ix)-a%f_z(iz)-a%f_yx(iy,ix)-a%f_yz(iy,iz)-a%f_xz(ix,iz)-a%f_empty
+          ENDDO
+       ENDDO
+       DO ix=x0,x1
+          DO it=t0,t1
+             a%f_yxt(iy,ix,it)=avg_z(iy,ix,it)-a%f_y(iy)-a%f_x(ix)-a%f_t(it)-a%f_yx(iy,ix)-a%f_yt(iy,it)-a%f_xt(ix,it)-a%f_empty
+          ENDDO
+       ENDDO
+       DO iz=1,nz
+          DO it=t0,t1
+             a%f_yzt(iy,iz,it)=avg_x(iy,iz,it)-a%f_y(iy)-a%f_z(iz)-a%f_t(it)-a%f_yz(iy,iz)-a%f_yt(iy,it)-a%f_zt(iz,it)-a%f_empty  
+          ENDDO
+       ENDDO
     ENDDO
 
     DO ix=x0,x1     
-       DO iz=1,nz; DO it=t0,t1
-          a%f_xzt(ix,iz,it)=avg_y(ix,iz,it)-a%f_x(ix)-a%f_z(iz)-a%f_t(it)-a%f_xz(ix,iz)-a%f_xt(ix,it)-a%f_zt(iz,it)-a%f_empty  
-       ENDDO;ENDDO 
+       DO iz=1,nz
+          DO it=t0,t1
+             a%f_xzt(ix,iz,it)=avg_y(ix,iz,it)-a%f_x(ix)-a%f_z(iz)-a%f_t(it)-a%f_xz(ix,iz)-a%f_xt(ix,it)-a%f_zt(iz,it)-a%f_empty  
+          ENDDO
+       ENDDO
     ENDDO
+
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
     ! STEP 3 Total variance and residual 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! 
-    a%si(:DLAST) = 0. 
-    DO it=t0,t1; DO ix=x0,x1  
-       pos(1)=ix 
-       pos(2)=it 
-       CALL ncrw_getvar_slice(vname,yz_dims,xt_dims,pos,data)   
-       data = data(:,:) - a%f_empty 
-       DO iy=1,ny; DO iz=1,nz  
-          f_yxzt(iy,iz) = data(iy,iz) &
-               - a%f_yxz(iy,ix,iz) - a%f_yxt(iy,ix,it) - a%f_yzt(iy,iz,it) - a%f_xzt(ix,iz,it) &
-               - a%f_yx(iy,ix) - a%f_yz(iy,iz) - a%f_yt(iy,it) - a%f_xz(ix,iz) - a%f_xt(ix,it) - a%f_zt(iz,it) & 
-               - a%f_x(ix) - a%f_y(iy) - a%f_z(iz) - a%f_t(it) ! -f_empty already above 
-       ENDDO; ENDDO 
-       a%si(DTOT)=a%si(DTOT) + ( SUM(data * data) ) 
-       a%si(DYXZT)=a%si(DYXZT) + ( SUM(f_yxzt*f_yxzt) ) 
+    a%si(:) = 0. 
+    DO it=t0,t1 
+       DO ix=x0,x1  
+          pos(1)=ix 
+          pos(2)=it 
+          CALL ncrw_getvar_slice(vname,yz_dims,xt_dims,pos,data)   
+          data = data(:,:) - a%f_empty 
+          DO iy=1,ny 
+             DO iz=1,nz  
+                f_yxzt(iy,iz) = data(iy,iz) &
+                     - a%f_yxz(iy,ix,iz) - a%f_yxt(iy,ix,it) - a%f_yzt(iy,iz,it) - a%f_xzt(ix,iz,it) &
+                     - a%f_yx(iy,ix) - a%f_yz(iy,iz) - a%f_yt(iy,it) - a%f_xz(ix,iz) - a%f_xt(ix,it) - a%f_zt(iz,it) & 
+                     - a%f_x(ix) - a%f_y(iy) - a%f_z(iz) - a%f_t(it) ! -f_empty already above 
+             ENDDO
+          ENDDO
+          a%si(DTOT)=a%si(DTOT) + ( SUM(data * data)/nyxzt ) 
+          a%si(DYXZT)=a%si(DYXZT) + ( SUM(f_yxzt*f_yxzt)/nyxzt ) 
     ENDDO; ENDDO 
-
-    a%si(DTOT) = a%si(DTOT) / nyxzt
-    a%si(DYXZT)= a%si(DYXZT)/ nyxzt
-
-    IF ( ncrw_verbose ) WRITE(*,*) 'ANOVA_DECOMP4D: Global average ', a%f_empty 
 
     a%si(DX)=SUM(a%f_x*a%f_x)/nx
     a%si(DY)=SUM(a%f_y*a%f_y)/ny
@@ -912,16 +936,15 @@ MODULE ANOVA
          - a%si(DYXZ)-a%si(DYXT)-a%si(DYZT)-a%si(DXZT) & 
          - a%si(DYXZT)
 
-    IF ( a%si_residual/a%si(DTOT) .GT. SMALL_DELTA ) THEN 
-       WRITE(*,*) 'ANOVA_DECOMP4D: RESIDUAL VARIANCE', a%si_residual, 'GLOBAL AVG:',a%f_empty 
-       STOP 'ERROR: ANOVA_DECOMP4D VARIANCE NOT DECOMPOSED'
+    WRITE(*,*) 'ANOVA_DECOMP4D: TOTAL VARIANCE:', a%si(DTOT), 'RESIDUAL VARIANCE', a%si_residual, 'GLOBAL AVG:',a%f_empty 
+    IF ( ABS(a%si_residual/a%si(DTOT)) .GT. SMALL_DELTA ) THEN 
+       STOP 'ERROR: ANOVA_DECOMP4D VARIANCE NOT DECOMPOSED' 
     ENDIF
 
     CALL GET_SORT_INDICES(DLAST,a%si,a%si_order)
 
     IF ( ncrw_verbose ) & 
          CALL TIMER_FINISH('ANOVA_DECOMP4D: STEP 2 Time elapse') 
-
     RETURN 
 
   END SUBROUTINE ANOVA_DECOMP4D
