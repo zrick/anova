@@ -425,19 +425,19 @@ MODULE ANOVA
     ENDDO
 
     ! Check if all fields average out to the same as the total data
-    IF ( SUM(avg_yx)/nz-avg_yxz .GT. SMALL_DELTA .OR. &  
-         SUM(avg_yz)/nx-avg_yxz .GT. SMALL_DELTA .OR. & 
-         SUM(avg_xz)/ny-avg_yxz .GT. SMALL_DELTA .OR. & 
-         SUM(avg_x)/nyz-avg_yxz .GT. SMALL_DELTA .OR. & 
-         SUM(avg_y)/nxz-avg_yxz .GT. SMALL_DELTA .OR. & 
-         SUM(avg_z)/nyx-avg_yxz .GT. SMALL_DELTA )  THEN  
+    IF ( ABS(SUM(avg_yx)/nz-avg_yxz) .GT. SMALL_DELTA .OR. &  
+         ABS(SUM(avg_yz)/nx-avg_yxz) .GT. SMALL_DELTA .OR. & 
+         ABS(SUM(avg_xz)/ny-avg_yxz) .GT. SMALL_DELTA .OR. & 
+         ABS(SUM(avg_x)/nyz-avg_yxz) .GT. SMALL_DELTA .OR. & 
+         ABS(SUM(avg_y)/nxz-avg_yxz) .GT. SMALL_DELTA .OR. & 
+         ABS(SUM(avg_z)/nyx-avg_yxz) .GT. SMALL_DELTA )  THEN  
        WRITE(*,*) 'yx:',SUM(avg_yx/nz) - avg_yxz
        WRITE(*,*) 'yz:',SUM(avg_yz/nx) - avg_yxz
        WRITE(*,*) 'xz:',SUM(avg_xz/ny) - avg_yxz
        WRITE(*,*) 'x: ',SUM(avg_x/nyz) - avg_yxz
        WRITE(*,*) 'y: ',SUM(avg_y/nxz) - avg_yxz
        WRITE(*,*) 'z: ',SUM(avg_z/nyx) - avg_yxz
-       STOP 'CONSERVATION PROBLEM IN DECOMPOSITION'    
+       STOP 'ANOVA_DECOMP3D: CONSERVATION PROBLEM IN DECOMPOSITION'    
     ENDIF
     
     IF ( ncrw_verbose ) THEN  
@@ -548,7 +548,7 @@ MODULE ANOVA
          chk_yx_vs_yz, chk_yx_vs_xz, chk_yz_vs_xz,chk_x_vs_z,chk_x_vs_xz,chk_z_vs_xz,chk_y_vs_z,& 
          chk_y_vs_yz,chk_z_vs_yz/) )
 
-    IF ( max_err /a%si(DTOT)  .GT. SQRT(SMALL_DELTA) ) THEN 
+    IF ( ABS(max_err /a%si(DTOT))  .GT. SQRT(SMALL_DELTA) ) THEN 
        WRITE(*,*) 'ANOVA_DECOMP3D: Orthogonality of ANOVA decomposition violated by', max_err /a%si(DTOT)
        STOP 'ANOVA_DECOMP3D: ORTHOGONALITY VIOLATED'
     ENDIF
@@ -804,20 +804,35 @@ MODULE ANOVA
     ENDDO;ENDDO
 
     ! Check if all fields average out to the same as the total data
-    IF ( SUM(avg_yxt/nz) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_yzt/nx) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_xzt/ny) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_yxz/nt) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_yx/nzt) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_yz/nxt) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_y/nxzt) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_xz/nyt) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_xt/nyz) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_zt/nyx) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_x/nyzt) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_y/nxzt) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_z/nyxt) - avg_yxzt .GT. SMALL_DELTA .OR. &
-         SUM(avg_t/nyxz) - avg_yxzt .GT. SMALL_DELTA ) THEN
+    IF ( ABS(SUM(avg_yxt/nz) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_yzt/nx) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_xzt/ny) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_yxz/nt) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_yx/nzt) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_yz/nxt) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_y/nxzt) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_xz/nyt) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_xt/nyz) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_zt/nyx) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_x/nyzt) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_y/nxzt) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_z/nyxt) - avg_yxzt) .GT. SMALL_DELTA .OR. &
+         ABS(SUM(avg_t/nyxz) - avg_yxzt) .GT. SMALL_DELTA ) THEN
+       WRITE(*,*) 'YXT: ',ABS(SUM(avg_yxt/nz) - avg_yxzt)
+       WRITE(*,*) 'YZT: ',ABS(SUM(avg_yzt/nx) - avg_yxzt)
+       WRITE(*,*) 'XZT: ',ABS(SUM(avg_xzt/ny) - avg_yxzt)
+       WRITE(*,*) 'YXZ: ',ABS(SUM(avg_yxz/nt) - avg_yxzt)
+       WRITE(*,*) 'YX:  ',ABS(SUM(avg_yx/nzt) - avg_yxzt)
+       WRITE(*,*) 'YZ:  ',ABS(SUM(avg_yz/nxt) - avg_yxzt)
+       WRITE(*,*) 'YT:  ',ABS(SUM(avg_yt/nxz) - avg_yxzt)
+       WRITE(*,*) 'XZ:  ',ABS(SUM(avg_xz/nyt) - avg_yxzt)
+       WRITE(*,*) 'XT:  ',ABS(SUM(avg_xt/nyz) - avg_yxzt)
+       WRITE(*,*) 'ZT:  ',ABS(SUM(avg_zt/nyx) - avg_yxzt)
+       WRITE(*,*) 'X:   ',ABS(SUM(avg_x/nyzt) - avg_yxzt)
+       WRITE(*,*) 'Y:   ',ABS(SUM(avg_y/nxzt) - avg_yxzt)
+       WRITE(*,*) 'Z:   ',ABS(SUM(avg_z/nyxt) - avg_yxzt)
+       WRITE(*,*) 'T:   ',ABS(SUM(avg_t/nyxz) - avg_yxzt) 
+       WRITE(*,*) 'AVG: ',avg_yxzt
        STOP 'ANOVA_DECOMP4D: CONSERVATION PROBLEM IN DECOMPOSITION'   
     ELSE 
        IF ( ncrw_verbose ) & 
